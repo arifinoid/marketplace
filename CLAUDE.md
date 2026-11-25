@@ -70,6 +70,19 @@ from `.env.local` (server-only, gitignored).
 - Accessibility: labelled inputs, real buttons, focus-visible rings, `aria-live`
   for async feedback, `prefers-reduced-motion` respected.
 
+## Skills
+
+Project skills live in `.agents/skills/` and are pinned by `skills-lock.json`:
+
+- `supabase`, `supabase-postgres-best-practices` — load before any schema, RLS,
+  migration, index, or Supabase client work.
+- `better-accessibility`, `better-colors`, `better-layout`, `better-motion`,
+  `better-typography`, `better-ui`, `better-interface`, `better-writing`,
+  `interface-review`, `build-design` — design review for UI work.
+
+These are project skills (not auto-loaded from `~/.claude/skills`); read the
+relevant `SKILL.md` before starting the matching milestone.
+
 ## Testing
 
 - Vitest, **node** environment, colocated `src/lib/**/*.test.ts` (validation,
