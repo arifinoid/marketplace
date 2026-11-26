@@ -5,7 +5,8 @@ listing and message a seller, and everything is public.
 
 Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 
-**Status:** M1 + M2 + M3 + M4 + M5 + M6 + M7 + M8 done. Live at
+**Status:** M1 + M2 + M3 + M4 + M5 + M6 + M7 + M8 done; Test 4 (Stripe
+Connect) planned as M9–M12 below. Live at
 <https://arifinoid-marketplace.vercel.app/>.
 
 - **M1** — Next.js 15 + Tailwind v4 + shadcn `base-nova` scaffold, theme tokens,
@@ -55,6 +56,37 @@ Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
   no DELETE policy, so a category that is empty today may not be tomorrow
   (Vehicles went 0 → 1 on 2026-11-26).
 
+## Stripe Connect (M9–M12)
+
+Add payments to the M1–M8 board. Sandbox only — the platform's test keys are
+used and no real money moves.
+
+**Done when all four work on the live site:**
+
+1. A seller finishes Stripe onboarding from a "Connect with Stripe" page.
+2. That seller's listings show a **Buy Now** button that opens Stripe Checkout.
+3. A `4242 4242 4242 4242` payment succeeds and the seller is paid minus the
+   platform fee (10%).
+4. The buyer sees a success page, the order is saved in Supabase, and the
+   listing shows as **Sold**.
+
+**Decisions:** Express connect accounts; direct charge on the connected account
+with `application_fee_amount`; the seller is identified by the `seller_email` on
+their listings (still no auth); Sold is derived from a paid `orders` row, so
+`listings` needs no UPDATE policy.
+
+- **M9** — Stripe foundation: `stripe` SDK, a server-only client, money/fee
+  helpers, unit tests.
+- **M10** — Seller onboarding: `stripe_accounts` table, `/connect`,
+  `POST /api/connect/account-link`, `GET /api/connect/status`, the
+  `account.updated` webhook, and the sidebar entry.
+- **M11** — Checkout: `orders` table, Buy Now, `POST /api/checkout`,
+  `/checkout/success` + `/checkout/cancel`, the `checkout.session.completed`
+  webhook, and the Sold badge.
+- **M12** — Docs, verification and submission: `PLAN.md` / `SPECS.md` /
+  `DESIGN.md` / `DATABASE.md`, screenshots, the four gates plus e2e, and the
+  apply.capm.us form.
+
 ## Done criteria
 
 The build passes when all four work on the live site:
@@ -97,8 +129,13 @@ Bonus (optional): keyword search; email the seller when a message arrives.
 | M6 | Detail & message | `/item/[id]`, message form, success / error feedback. |
 | M7 | Verify | `typecheck`, `lint`, unit tests, `build`, e2e smoke, deploy. |
 | M8 | Docs | `README.md`, `CLAUDE.md`, this plan. |
+| M9 | Stripe foundation | `stripe` SDK, server-only client, money/fee helpers, unit tests. |
+| M10 | Seller onboarding | `stripe_accounts`, `/connect`, account-link API, `account.updated` webhook. |
+| M11 | Checkout | `orders`, Buy Now, `/api/checkout`, success page, Sold state. |
+| M12 | Verify & submit | Docs, screenshots, gates + e2e, apply.capm.us. |
 
-Each milestone ends on a working app; M3–M6 are the four done criteria.
+Each milestone ends on a working app; M3–M6 are the four done criteria, and
+M9–M12 are the four Stripe criteria above.
 
 ## Quality gates
 
