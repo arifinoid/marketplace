@@ -1,0 +1,34 @@
+name: E2E
+
+# The end-to-end tests talk to the real Supabase project, so they need
+# SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY as repository secrets. Add them in
+# Settings -> Secrets and variables -> Actions, then run this workflow by hand.
+#
+# They also write real rows: the schema has no DELETE policy.
+on:
+  workflow_dispatch:
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: End-to-end tests
+        run: npm run test:e2e
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
