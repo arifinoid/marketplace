@@ -129,6 +129,57 @@ test("a visitor can create a listing with a photo", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toContainText(title)
   await expect(page.getByText(`$${price}`)).toBeVisible()
   await expect(page.getByText("e2e-seller@example.com")).toBeVisible()
+
+  // This seller has never connected Stripe, so the listing must not offer a
+  // checkout that would fail. `sellerReady` is what gates it.
+  await expect(page.getByRole("heading", { name: "Buy it now" })).toHaveCount(0)
+  const listingUrl = page.url()
+  const listingId = listingUrl.slice(listingUrl.lastIndexOf("/") + 1)
+  const detail = await page.request.get(`/api/listings/${listingId}`)
+  expect(detail.ok()).toBeTruthy()
+  const detailBody = (await detail.json()) as {
+    data: { sold: boolean; sellerReady: boolean }
+  }
+  expect(detailBody.data.sellerReady).toBe(false)
+  expect(detailBody.data.sold).toBe(false)
+})
+
+test("the shell links to Stripe onboarding", async ({ page }) => {
+  await page.goto("/")
+
+  await page.getByRole("link", { name: "Connect with Stripe" }).click()
+  await expect(page).toHaveURL(/\/connect$/)
+
+  await expect(
+    page.getByRole("heading", { name: "Connect with Stripe" }),
+  ).toBeVisible()
+  await expect(page.getByLabel("Seller email")).toBeVisible()
+  await expect(
+    page.getByRole("button", { name: "Connect with Stripe" }),
+  ).toBeVisible()
+})
+
+test("the checkout pages and endpoint reject an unknown session or listing", async ({
+  page,
+}) => {
+  // Both pages read the session back from the order store, so a bare visit is a
+  // 404 rather than an empty success message.
+  for (const path of ["/checkout/success", "/checkout/cancel"]) {
+    const response = await page.request.get(path)
+    expect(response.status()).toBe(404)
+  }
+
+  // A well-formed body for a listing that does not exist is a conflict, not a
+  // checkout: the route must look the listing up before creating a session.
+  const response = await page.request.post("/api/checkout", {
+    data: {
+      listing_id: "018f6c2e-8f9a-7b8c-9d0e-1f2a3b4c5d6e",
+      buyer_email: "e2e-buyer@example.com",
+    },
+  })
+  expect(response.status()).toBe(409)
+  const body = (await response.json()) as { error: { message: string } }
+  expect(body.error.message).toContain("no longer available")
 })
 
 test("the shell links to the create flow", async ({ page }) => {

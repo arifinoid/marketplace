@@ -67,7 +67,10 @@ export function BuyNowForm({ listingId }: BuyNowFormProps) {
       <h2 className="text-sm font-medium">Buy it now</h2>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="buyer-email">Your email</Label>
+        {/* "Buyer email", not "Your email": the message form below uses that
+            label, and two identical labels would be ambiguous for a screen
+            reader and for tests. */}
+        <Label htmlFor="buyer-email">Buyer email</Label>
         <Input
           id="buyer-email"
           type="email"
