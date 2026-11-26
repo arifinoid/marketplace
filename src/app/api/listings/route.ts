@@ -1,6 +1,11 @@
 import { NextRequest } from "next/server"
 import { parseListingsQuery } from "@/lib/api/params"
-import { badRequest, created, ok, serverError } from "@/lib/api/response"
+import {
+  badRequest,
+  created,
+  okWithCache,
+  serverError,
+} from "@/lib/api/response"
 import { createListing, listListings } from "@/lib/listings/queries"
 import { validateListingInput } from "@/lib/listings/validation"
 
@@ -11,7 +16,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    return ok(await listListings(parsed.value))
+    return okWithCache(await listListings(parsed.value))
   } catch (error) {
     console.error("GET /api/listings failed:", error)
     return serverError()

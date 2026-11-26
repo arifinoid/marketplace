@@ -31,9 +31,10 @@ export function getSupabase(): SupabaseClient {
     },
   })
 
-  if (process.env.NODE_ENV !== "production") {
-    globalForSupabase.supabase = client
-  }
+  // Cached on globalThis so a warm function instance reuses one client and its
+  // keep-alive connections. Re-creating it per request would pay DNS + TCP + TLS
+  // to Supabase on every call, which dominates latency from a remote function.
+  globalForSupabase.supabase = client
 
   return client
 }

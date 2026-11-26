@@ -1,6 +1,11 @@
 import { NextRequest } from "next/server"
 import { parseUuid } from "@/lib/api/params"
-import { badRequest, notFound, ok, serverError } from "@/lib/api/response"
+import {
+  badRequest,
+  notFound,
+  okWithCache,
+  serverError,
+} from "@/lib/api/response"
 import { getListing } from "@/lib/listings/queries"
 
 interface RouteContext {
@@ -19,7 +24,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
     if (!listing) {
       return notFound("Listing not found")
     }
-    return ok(listing)
+    return okWithCache(listing)
   } catch (error) {
     console.error(`GET /api/listings/${listingId} failed:`, error)
     return serverError()
