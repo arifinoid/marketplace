@@ -46,6 +46,12 @@ Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
   and the function-region note in `vercel.json`. Verified live: 9/9 smoke checks
   on the production URL (pages `200`, unknown and malformed ids `404`, API `200`
   / `400`).
+- **Post-M8** — Fix a regression from the latency work (#9): `?category=` returned
+  every listing, because a PostgREST embed is a left join and the filter only
+  nulled out the embed. `listListings` now selects `categories!inner(...)`; a new
+  unit test pins the built query. Verified: 45/45 unit tests, 2/2 e2e against a
+  production build, and `?category=electronics` returns only electronics while
+  `?category=vehicles` returns none.
 
 ## Done criteria
 
