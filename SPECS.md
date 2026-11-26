@@ -80,6 +80,9 @@ src/
     stripe/{server,money,event-notification}.ts # SDK client, cent math, thin-event check
     categories.ts              # slug <-> name helpers
     utils.ts                   # cn()
+scripts/
+  create-webhook.mjs           # register the Connect endpoint, print whsec_…
+  checkout-e2e.mjs             # real 4242 payment against a deployed site
 ```
 
 Rules:
@@ -374,6 +377,16 @@ The listing is created only after the upload succeeds (photo is required).
   `npm run test:e2e` starts the dev server itself; set `E2E_BASE_URL` to test a
   deployed environment instead. `.github/workflows/e2e.yml` runs them manually
   with the Supabase variables as repository secrets.
+- `scripts/checkout-e2e.mjs` is the payment counterpart: it drives a real
+  browser through Buy Now → hosted Checkout → `4242 4242 4242 4242`, then
+  asserts the success page, the `orders` row (amount + 10% fee) and `sold`. It
+  needs `PAY_SELLER_EMAIL` to point at a seller that already finished the
+  Stripe-hosted onboarding, because that form is not automated. It writes a
+  screenshot to `docs/screenshots/checkout-success.png`. Run it with
+  `node --env-file=.env.local scripts/checkout-e2e.mjs`; on NixOS also set
+  `PAY_BROWSER_PATH` to a system browser and put an older `alsa-lib` on
+  `LD_LIBRARY_PATH` (Playwright's bundled Chromium cannot resolve its dynamic
+  linker there).
 - Gate: `npm run typecheck && npm run lint && npm test`; `npm run build` before
   deploy.
 
@@ -385,10 +398,12 @@ The listing is created only after the upload succeeds (photo is required).
   add `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY` and
   `STRIPE_WEBHOOK_SECRET` in the Vercel dashboard (plus `NEXT_PUBLIC_APP_URL`
   if the forwarded host is not the public one).
-- The Stripe webhook endpoint is registered **once**, in the Stripe dashboard,
-  against the production URL — Vercel preview URLs are login-protected, so
-  Stripe cannot reach them. `STRIPE_WEBHOOK_SECRET` is the signing secret of
-  that endpoint.
+- The Stripe webhook endpoint is registered **once**, against the production URL
+  — Vercel preview URLs are login-protected, so Stripe cannot reach them.
+  `scripts/create-webhook.mjs` does it and prints the signing secret, which is
+  shown once; that value is `STRIPE_WEBHOOK_SECRET`. Test mode allows only 16
+  endpoints per Stripe account, so registration can fail until a slot is freed
+  (delete a `disabled` one).
 - `vercel.json` pins functions to `hnd1` (Tokyo), next to the Supabase project in
   `ap-northeast-1`.
 - Production URL is the public entry point
