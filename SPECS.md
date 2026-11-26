@@ -381,8 +381,11 @@ The listing is created only after the upload succeeds (photo is required).
   browser through Buy Now → hosted Checkout → `4242 4242 4242 4242`, then
   asserts the success page, the `orders` row (amount + 10% fee) and `sold`. It
   needs `PAY_SELLER_EMAIL` to point at a seller that already finished the
-  Stripe-hosted onboarding, because that form is not automated. It writes a
-  screenshot to `docs/screenshots/checkout-success.png`. Run it with
+  Stripe-hosted onboarding, because that form is not automated. It writes
+  screenshots to `docs/screenshots/`: `buy-now.png` (the listing with the Buy Now
+  card), `checkout.png` (the hosted Checkout with the card filled),
+  `checkout-success.png`, and `order-supabase.png` (the `orders` row read back
+  from PostgREST). Run it with
   `node --env-file=.env.local scripts/checkout-e2e.mjs`; on NixOS also set
   `PAY_BROWSER_PATH` to a system browser and put an older `alsa-lib` on
   `LD_LIBRARY_PATH` (Playwright's bundled Chromium cannot resolve its dynamic

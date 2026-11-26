@@ -125,6 +125,13 @@ hosted Checkout with `4242 4242 4242 4242`, then asserts the success page, the
 `orders` row (amount + 10% fee) and the Sold flag. It prints one line per check
 and exits non-zero if any fail.
 
+It also writes the submission screenshots to `docs/screenshots/`:
+`buy-now.png`, `checkout.png` (card filled, before paying),
+`checkout-success.png`, and `order-supabase.png` (the `orders` row read back from
+PostgREST). `onboarding.png` — Stripe's hosted onboarding page — and
+`connect-status.png` are captured separately, because onboarding is a
+Stripe-hosted form gated by hCaptcha and needs a person to finish.
+
 `PAY_BROWSER_PATH` is only needed where Playwright's bundled Chromium cannot
 run — on NixOS it cannot resolve its dynamic linker, and the system Chromium
 also needs an older `alsa-lib` on `LD_LIBRARY_PATH` or it dies with a

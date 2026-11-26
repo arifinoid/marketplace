@@ -11,7 +11,11 @@ Extracted from the mockups in `assets/images/`:
 | `image(4).png` | Listing detail + message seller |
 
 Screenshots of the built app (home, listing detail, `/connect`, `/create/item`,
-and the mobile home) live in `docs/screenshots/`.
+and the mobile home) live in `docs/screenshots/`. The Stripe flow is captured
+there too: `onboarding.png` (Stripe's hosted onboarding page),
+`connect-status.png` (`/connect` once the account is connected), `buy-now.png`
+and `checkout.png` (the Buy Now card and the hosted Checkout),
+`checkout-success.png`, and `order-supabase.png` (the saved `orders` row).
 
 ## Visual language
 
