@@ -6,8 +6,10 @@ listing and message a seller, and everything is public.
 Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 
 **Status:** M1 + M2 + M3 + M4 + M5 + M6 + M7 + M8 + M9 + M10 + M11 + M12 done;
-Test 4 (Stripe Connect) is M9–M12 below, plus a Post-M12 fix that moves Connect
-to Stripe Accounts v2. Live at <https://arifinoid-marketplace.vercel.app/>.
+Test 4 (Stripe Connect) is M9–M12 below, plus two Post-M12 fixes — one that
+moves Connect to Stripe Accounts v2, and one that registers the webhook endpoint
+and proves a real `4242` payment end to end. Live at
+<https://arifinoid-marketplace.vercel.app/>.
 
 - **M1** — Next.js 15 + Tailwind v4 + shadcn `base-nova` scaffold, theme tokens,
   app shell (sidebar + header). Verified: typecheck / lint / build / SSR smoke.
@@ -127,6 +129,19 @@ their listings (still no auth); Sold is derived from a paid `orders` row, so
   session through `fetchRelatedObject` and is acknowledged without an order
   while the session is unpaid. A completed payment still needs a seller to
   finish the hosted onboarding form.
+- **Post-M12 (2)** — Register the endpoint and prove a real payment. Test mode
+  caps an account at 16 endpoints and this shared sandbox already had 16, so a
+  `disabled` one was deleted to free a slot; `scripts/create-webhook.mjs` then
+  created `we_1Ug5C5…` for the production URL and its `whsec_…` went into
+  `STRIPE_WEBHOOK_SECRET` on Vercel. Live delivery was confirmed by updating the
+  connected account's metadata: Stripe sent `account.updated`, the route verified
+  the signature and appended a `stripe_account_events` row. `rohmadarifin007@gmail.com`
+  then finished hosted onboarding (`charges_enabled`, `details_submitted`,
+  `payouts_enabled` all true), and `scripts/checkout-e2e.mjs` paid a 1234-cent
+  listing with `4242 4242 4242 4242`: the success page confirmed, the `orders`
+  row recorded 1234 cents with a 123-cent fee, the charge on the connected
+  account succeeded with a 123-cent application fee, and the listing shows
+  `sold: true` — 7/7 checks. Screenshot in `docs/screenshots/checkout-success.png`.
 
 ## Done criteria
 

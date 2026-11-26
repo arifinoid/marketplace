@@ -40,13 +40,17 @@ reach them:
 node --env-file=.env.local scripts/create-webhook.mjs
 ```
 
-The script prints the signing secret, which is shown once. Subscribe to `checkout.session.completed`, `account.updated`, and the
-`v2.core.account[requirements].updated` /
-`v2.core.account[configuration.merchant]*` events — accounts are created through
-Accounts v2, and Stripe may deliver an account change under either the v1 or the
-v2 name depending on how the destination was registered. The handler verifies
-the signature against the raw body and branches between classic v1 events and
-thin v2 notifications, which need different SDK calls.
+The script prints the signing secret, which is shown once. Accounts are created
+through Accounts v2, but this platform rejects the `v2.core.account[*]` event
+names, so the endpoint subscribes to `checkout.session.completed` and
+`account.updated`. That is enough: the handler re-reads the account from Stripe
+on every `account.updated` rather than trusting a stored flag. It verifies the
+signature against the raw body and branches between classic v1 events and thin
+v2 notifications, which need different SDK calls.
+
+Test mode allows only 16 webhook endpoints per Stripe account. If registration
+fails with "You have reached the maximum of 16 test webhook endpoints", free a
+slot first — a `disabled` endpoint is the safe one to delete.
 
 ## Quick start
 
@@ -79,6 +83,7 @@ Apply `DATABASE.md` in the Supabase SQL editor before creating listings.
 | `npm test` | Vitest unit tests |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run test:e2e` | Playwright end-to-end tests |
+| `node --env-file=.env.local scripts/checkout-e2e.mjs` | Pay a real listing with the sandbox card |
 
 Gate before committing: `npm run typecheck && npm run lint && npm test`.
 Run `npm run build` before deploying.
@@ -102,8 +107,33 @@ them on demand with `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` as secrets.
 
 The Stripe part is covered without moving money: the tests check that `/connect`
 is reachable, that a listing whose seller has not connected shows no Buy Now
-card, and that both checkout pages 404 without a `session_id`. A real payment
-needs a seller to finish onboarding in the sandbox first.
+card, and that both checkout pages 404 without a `session_id`.
+
+A **real** payment is a separate script, because onboarding is a Stripe-hosted
+form that needs a person:
+
+```bash
+LD_LIBRARY_PATH=/nix/store/<…>-alsa-lib-1.2.13/lib \
+PAY_BROWSER_PATH=/etc/profiles/per-user/$USER/bin/chromium \
+node --env-file=.env.local scripts/checkout-e2e.mjs
+```
+
+`scripts/checkout-e2e.mjs` creates a listing for `PAY_SELLER_EMAIL` (default
+`rohmadarifin007@gmail.com`, which has already finished onboarding — check with
+`/api/connect/status?email=…`), clicks **Buy Now** on the real page, pays the
+hosted Checkout with `4242 4242 4242 4242`, then asserts the success page, the
+`orders` row (amount + 10% fee) and the Sold flag. It prints one line per check
+and exits non-zero if any fail.
+
+`PAY_BROWSER_PATH` is only needed where Playwright's bundled Chromium cannot
+run — on NixOS it cannot resolve its dynamic linker, and the system Chromium
+also needs an older `alsa-lib` on `LD_LIBRARY_PATH` or it dies with a
+`GLIBC_2.43` error. On macOS and most Linux hosts the plain
+`node --env-file=.env.local scripts/checkout-e2e.mjs` works.
+
+Verified live 2026-11-26: `4242` paid a 1234-cent listing, the connected
+account received a succeeded charge with a 123-cent application fee, and the
+listing flipped to `sold: true` — 7/7 checks.
 
 ## Docs
 
