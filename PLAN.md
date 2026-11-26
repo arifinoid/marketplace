@@ -5,8 +5,8 @@ listing and message a seller, and everything is public.
 
 Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 
-**Status:** M1 + M2 + M3 + M4 + M5 + M6 + M7 + M8 + M9 + M10 done; Test 4
-(Stripe Connect) is M9–M12 below, with M11 in progress. Live at
+**Status:** M1 + M2 + M3 + M4 + M5 + M6 + M7 + M8 + M9 + M10 + M11 done; Test 4
+(Stripe Connect) is M9–M12 below, with M12 in progress. Live at
 <https://arifinoid-marketplace.vercel.app/>.
 
 - **M1** — Next.js 15 + Tailwind v4 + shadcn `base-nova` scaffold, theme tokens,
@@ -95,7 +95,12 @@ their listings (still no auth); Sold is derived from a paid `orders` row, so
   `orders` SQL applied and `STRIPE_WEBHOOK_SECRET`.
 - **M12** — Docs, verification and submission: `PLAN.md` / `SPECS.md` /
   `DESIGN.md` / `DATABASE.md`, screenshots, the four gates plus e2e, and the
-  apply.capm.us form.
+  apply.capm.us form. Verified: typecheck / lint / 92 tests / build, 5/5 e2e
+  against the live site, screenshots in `docs/screenshots/`, and a live
+  re-check after the M11 merge (`/` `200`, `/api/listings` `200` with `sold`
+  in the payload, `/connect` `200`; `/api/listings/[id]` uncached). A real
+  payment still needs a sandbox seller to finish onboarding and the Connect
+  webhook endpoint registered in Stripe.
 
 ## Done criteria
 

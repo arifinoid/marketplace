@@ -16,6 +16,26 @@ Bonus: keyword search, email the seller on message.
 
 **Live:** <https://arifinoid-marketplace.vercel.app/>
 
+## Stripe Connect (Test 4)
+
+Sandbox only — the platform's test keys, no real money, no real payouts. A
+seller connects a Stripe account from `/connect`, their listings get a **Buy
+Now** button, and a `4242 4242 4242 4242` payment is a direct charge on that
+account with a 10% platform fee. The order is recorded by the webhook and the
+listing shows as **Sold**.
+
+```bash
+SUPABASE_URL=https://<project>.supabase.co
+SUPABASE_PUBLISHABLE_KEY=<publishable-or-anon-key>
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+`STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are server-only, like the
+Supabase pair. The webhook secret comes from the Connect endpoint registered
+against the **production** URL (`/api/stripe/webhook`) in the Stripe dashboard —
+Vercel protects preview deployments, so Stripe cannot reach them.
+
 ## Quick start
 
 ```bash
@@ -68,6 +88,11 @@ E2E_BASE_URL=https://arifinoid-marketplace.vercel.app/ npm run test:e2e
 DELETE policy, so expect them to accumulate. `.github/workflows/e2e.yml` runs
 them on demand with `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` as secrets.
 
+The Stripe part is covered without moving money: the tests check that `/connect`
+is reachable, that a listing whose seller has not connected shows no Buy Now
+card, and that both checkout pages 404 without a `session_id`. A real payment
+needs a seller to finish onboarding in the sandbox first.
+
 ## Docs
 
 | Doc | Purpose |
@@ -81,7 +106,8 @@ them on demand with `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` as secrets.
 ## Deploy
 
 Vercel import from the GitHub default branch; build command `npm run build`;
-add `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` as environment variables.
+add `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY` and
+`STRIPE_WEBHOOK_SECRET` as environment variables.
 Work on a feature branch and open a PR; the user merges.
 
 `vercel.json` pins functions to `hnd1` (Tokyo) so they run next to the Supabase
@@ -89,10 +115,12 @@ project. Change it if the database moves region.
 
 ## Performance
 
-`GET /api/listings` and `GET /api/listings/[id]` are anonymously readable and
-change only when someone posts, so they carry
-`Cache-Control: public, s-maxage=10, stale-while-revalidate=59` and are cached
+`GET /api/listings` is anonymously readable and changes only when someone
+posts, so it carries
+`Cache-Control: public, s-maxage=10, stale-while-revalidate=59` and is cached
 by the Vercel CDN. The policy lives in `src/lib/api/cache-policy.ts`.
+`GET /api/listings/[id]` is **not** cached — since Test 4 it also reports
+`sold` and `sellerReady`, which change the moment a payment lands.
 
 ```bash
 curl -sD - -o /dev/null \

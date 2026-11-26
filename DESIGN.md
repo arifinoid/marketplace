@@ -10,6 +10,9 @@ Extracted from the mockups in `assets/images/`:
 | `image(3).png` | Create — form + live preview |
 | `image(4).png` | Listing detail + message seller |
 
+Screenshots of the built app (home, listing detail, `/connect`, `/create/item`,
+and the mobile home) live in `docs/screenshots/`.
+
 ## Visual language
 
 Facebook Marketplace: a pale gray-blue canvas, white rounded cards, a single
@@ -98,7 +101,8 @@ Three columns on desktop, stacked on mobile.
   (placeholder "I want to buy your bike!"), and a primary **Send** button.
 - **Buy Now card** — above the message form, only when the seller has
   `charges_enabled` and the listing is not sold: "Buy it now" label, a
-  "Your email" input, and a full-width primary **Buy Now** button. The button
+  "Buyer email" input (deliberately not "Your email", which the message form
+  below already uses), and a full-width primary **Buy Now** button. The button
   shows a spinner and reads "Opening checkout…" while the session is created.
   A `409` ("already sold" / "seller not ready") renders as an inline
   `role="alert"` line; the buyer is not redirected.
