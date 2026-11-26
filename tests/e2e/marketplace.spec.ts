@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test"
+import { expect, test, type Page } from "@playwright/test"
 
 /**
  * End-to-end coverage for the four done criteria in PLAN.md. These tests talk to
@@ -18,6 +18,39 @@ const PHOTO = {
 
 const SEEDED_TITLE = "Test listing from Claude"
 
+interface ListingsResponse {
+  data: {
+    data: { title: string }[]
+    total: number
+  }
+}
+
+/**
+ * Every run leaves rows behind (see the missing DELETE policy above), so no
+ * category can be assumed empty — a hardcoded "this category has no listings"
+ * assertion breaks the moment anyone posts there, and a bare count assertion
+ * cannot tell a filtered grid from an unfiltered one. Compare the rendered
+ * cards against the API for the requested category instead: the count fails if
+ * the filter stops restricting parent rows, and the titles fail if the wrong
+ * rows leak in.
+ */
+async function expectGridMatchesCategory(page: Page, category: string) {
+  const response = await page.request.get(`/api/listings?category=${category}`)
+  expect(response.ok()).toBeTruthy()
+  const body = (await response.json()) as ListingsResponse
+
+  const cards = page.locator('section a[href^="/item/"]')
+  await expect(cards).toHaveCount(body.data.data.length)
+
+  const titles = new Set(body.data.data.map((listing) => listing.title))
+  const count = await cards.count()
+  for (let index = 0; index < count; index++) {
+    const alt = await cards.nth(index).locator("img").getAttribute("alt")
+    if (alt === null) throw new Error(`Card ${index} has no image alt text`)
+    expect(titles.has(alt)).toBe(true)
+  }
+}
+
 test("a visitor can browse, filter, open a listing and message the seller", async ({
   page,
 }) => {
@@ -32,13 +65,11 @@ test("a visitor can browse, filter, open a listing and message the seller", asyn
   await expect(
     page.getByRole("heading", { name: "Electronics" }),
   ).toBeVisible()
-  // Count-agnostic: every run leaves rows behind, so the Electronics total
-  // grows over time (see the note about the missing DELETE policy above).
-  await expect(page.getByRole("status")).toContainText("listing")
+  await expectGridMatchesCategory(page, "electronics")
 
   await page.getByRole("link", { name: "Vehicles" }).click()
   await expect(page).toHaveURL(/\?category=vehicles$/)
-  await expect(page.getByText("No listings yet")).toBeVisible()
+  await expectGridMatchesCategory(page, "vehicles")
 
   await page.getByRole("link", { name: "Electronics" }).click()
   const card = page.getByRole("link", { name: new RegExp(SEEDED_TITLE) })
