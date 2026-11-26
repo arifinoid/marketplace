@@ -5,7 +5,7 @@ listing and message a seller, and everything is public.
 
 Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 
-**Status:** M1 + M2 + M3 + M4 done.
+**Status:** M1 + M2 + M3 + M4 + M5 done.
 
 - **M1** — Next.js 15 + Tailwind v4 + shadcn `base-nova` scaffold, theme tokens,
   app shell (sidebar + header). Verified: typecheck / lint / build / SSR smoke.
@@ -23,6 +23,12 @@ Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
   retry. Verified: typecheck / lint / tests / build; end-to-end against a local
   mock Supabase (grid, `?category=` filter + heading, `?q=` search). Real
   Supabase still needs `.env.local` + the schema applied.
+- **M5** — Create: `/create` type picker (only *Item for sale* enabled) and the
+  `/create/item` three-pane form (details, live preview, summary) with photo
+  upload through `/api/upload`. Client validation mirrors the server rules;
+  submit posts the listing and redirects to `/item/[id]`. Verified: typecheck /
+  lint / tests / build + SSR smoke of both pages. Live submit still needs the
+  schema applied (tables + Storage bucket).
 
 ## Done criteria
 
