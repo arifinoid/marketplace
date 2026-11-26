@@ -75,9 +75,9 @@ src/
     api/origin.ts              # public origin for absolute URLs
     listings/{types,validation,queries,format}.ts
     messages/{types,validation}.ts
-    connect/{types,validation,queries,onboarding}.ts
+    connect/{types,validation,queries,onboarding,account-flags,account-status}.ts
     orders/{types,validation,queries,checkout}.ts
-    stripe/{server,money}.ts   # server-only SDK client + integer-cent math
+    stripe/{server,money,event-notification}.ts # SDK client, cent math, thin-event check
     categories.ts              # slug <-> name helpers
     utils.ts                   # cn()
 ```
@@ -154,9 +154,21 @@ message says which.
 { "email": "wei@example.com" }
 ```
 
-The email is trimmed and lowercased, then used to create (or reuse) an Express
-Connect account. The response `url` is a Stripe-hosted onboarding link whose
-`return_url` / `refresh_url` point back at `/connect?step=done|refresh&email=…`.
+The email is trimmed and lowercased, then used to create (or reuse) a Connect
+account through **Accounts v2** (`dashboard: "express"`,
+`defaults.responsibilities.losses_collector: "stripe"`). The v1 `type` field is
+rejected by this platform, which requires Stripe to hold the loss liability.
+The response `url` is a Stripe-hosted onboarding link (`v2/core/account_links`,
+`use_case.type: "account_onboarding"`, `collection_options.fields:
+"eventually_due"`) whose `return_url` / `refresh_url` point back at
+`/connect?step=done|refresh&email=…`.
+
+Accounts v2 has no `charges_enabled` boolean. `readAccountFlags`
+(`connect/account-flags.ts`) translates the account into the three flags the
+schema stores: `charges_enabled` from the `card_payments` capability status,
+`payouts_enabled` from whether a requirement still restricts
+`stripe_balance.payouts`, and `details_submitted` from whether any requirement
+is still awaiting action from the seller.
 
 ### `GET /api/connect/status` response
 
@@ -179,12 +191,24 @@ newest `stripe_account_events` row.
 
 Registered as a **Connect** endpoint (`connect: true`), because direct charges
 emit their events from the connected account. The handler reads the body as
-text — `constructEvent` verifies the signature against the exact bytes, so
-parsing the JSON first would break verification. Events handled:
-`account.updated` (append flags for accounts this app created) and
-`checkout.session.completed` (record the order). Unknown accounts are dropped:
-the sandbox is shared, so the endpoint also receives events for other
+text, because both verification helpers check the signature against the exact
+bytes. It branches on `isThinEventNotification(body)`
+(`src/lib/stripe/event-notification.ts`): a `v2.core.event` payload goes to
+`parseEventNotification`, anything else to `webhooks.constructEvent` — the
+latter rejects a thin notification outright. Events handled:
+`v2.core.account[requirements].updated`,
+`v2.core.account[configuration.merchant].updated`,
+`v2.core.account[configuration.merchant].capability_status_updated`, and
+`account.updated` — the v1 spelling of the same change, which some destination
+configurations deliver instead (append flags for accounts this app created) —
+plus `checkout.session.completed` (record the order). Unknown accounts are
+dropped: the sandbox is shared, so the endpoint also receives events for other
 candidates' sellers.
+
+Accounts v2 events carry a `related_object` reference instead of the account
+itself, so the handler re-reads the account from Stripe (`fetchAccountFlags`)
+before appending a `stripe_account_events` row. A classic `account.updated`
+carries the account in `data.object`; `readAccountId` accepts either.
 
 The order handler reads `listingId` / `stripeAccountId` / `feeCents` from the
 session **metadata**, which our own server wrote when it created the session —
@@ -270,7 +294,9 @@ The listing is created only after the upload succeeds (photo is required).
   redirect to Stripe. Returning with `?step=done&email=…` fetches
   `/api/connect/status` and shows either the connected panel or a
   "continue onboarding" form; `?step=refresh` shows the same form, since Stripe
-  sends sellers back there when a link expires.
+  sends sellers back there when a link expires. The redirect back can beat the
+  webhook, so `/api/connect/status` re-reads Stripe while the stored flags say
+  charges are not enabled yet, and appends what it learns.
 - **Listing card** — square photo, price, title (2-line clamp), location; links
   to `/item/[id]`.
 - **`/create`** — "Choose listing type" with four cards (Item for sale, Create
@@ -282,8 +308,8 @@ The listing is created only after the upload succeeds (photo is required).
   Submit = upload (if data URL / file not yet uploaded) → `POST /api/listings` →
   redirect to `/item/[id]`.
 - **`/item/[id]`** — photo, title, price, description, location, seller email,
-  the **Message Seller** form, and — only when the seller has
-  `charges_enabled` and the listing is not sold — a **Buy Now** card. Buy Now
+  the **Message Seller** form, and — only when the seller's account can accept
+  charges (`charges_enabled`) and the listing is not sold — a **Buy Now** card. Buy Now
   validates the email, posts to `/api/checkout`, then redirects the buyer to
   Stripe; a `409` is shown inline instead of redirecting. A **Sold** badge sits
   next to the title and on the grid card.

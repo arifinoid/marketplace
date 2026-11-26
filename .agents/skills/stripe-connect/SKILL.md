@@ -33,11 +33,15 @@ metadata:
 
 ## Connect Model Used Here
 
-Express accounts, direct charges.
+Express-dashboard accounts on **Accounts v2**, direct charges.
 
-- **Express** — Stripe owns KYC and the onboarding UI. The seller clicks an
-  account link, finishes onboarding on Stripe's pages, and is redirected back.
-  This is the fastest path and needs no PCI work from us.
+- **Accounts v2, `dashboard: "express"`** — Stripe owns KYC and the onboarding
+  UI. The seller clicks an account link, finishes onboarding on Stripe's pages,
+  and is redirected back. This is the fastest path and needs no PCI work from us.
+- **This platform requires Stripe to hold the loss liability**, so accounts are
+  created with `defaults.responsibilities.losses_collector: "stripe"` (and
+  `fees_collector: "stripe"`). Creating one with the legacy v1 `type` field is
+  rejected with `accounts_v2` guidance — do not add `type` back.
 - **Direct charge** — the Checkout Session is created *on the connected
   account* (pass `{ stripeAccount }` as the request options) and carries
   `payment_intent_data.application_fee_amount`. The buyer sees one combined
@@ -51,29 +55,48 @@ Express accounts, direct charges.
 ### Create a connected account and an onboarding link
 
 ```ts
-const account = await stripe.accounts.create({
-  type: "express",
-  country: "US",
-  email,
-  business_type: "individual",
-  capabilities: {
-    card_payments: { requested: true },
-    transfers: { requested: true },
+const account = await stripe.v2.core.accounts.create({
+  contact_email: email,
+  dashboard: "express",
+  identity: { country: "US", entity_type: "individual" },
+  configuration: {
+    merchant: { capabilities: { card_payments: { requested: true } } },
   },
+  defaults: {
+    currency: "usd",
+    responsibilities: { fees_collector: "stripe", losses_collector: "stripe" },
+  },
+  include: ["configuration.merchant", "requirements", "identity", "defaults"],
 })
 
-const link = await stripe.accountLinks.create({
+const link = await stripe.v2.core.accountLinks.create({
   account: account.id,
-  refresh_url: `${baseUrl}/connect?refresh=1`,
-  return_url: `${baseUrl}/connect?step=done`,
-  type: "account_onboarding",
+  use_case: {
+    type: "account_onboarding",
+    account_onboarding: {
+      collection_options: { fields: "eventually_due" },
+      refresh_url: `${baseUrl}/connect?step=refresh&email=${email}`,
+      return_url: `${baseUrl}/connect?step=done&email=${email}`,
+    },
+  },
 })
 // send the seller to link.url
 ```
 
-Store `account.id` against `seller_email` in `stripe_accounts`. Onboarding is
-complete when `charges_enabled` is true, which arrives via `account.updated` and
-can also be re-checked with `stripe.accounts.retrieve()`.
+Store `account.id` against `seller_email` in `stripe_accounts`.
+
+Accounts v2 has no `charges_enabled` boolean. Read readiness back as:
+
+- `charges_enabled` — `configuration.merchant.capabilities.card_payments.status
+  === "active"` (retrieve with `include: ["configuration.merchant"]`).
+- `details_submitted` — no entry in `requirements.entries` has
+  `awaiting_action_from: "user"`.
+- `payouts_enabled` — no requirement's `impact.restricts_capabilities` lists
+  `stripe_balance.payouts`.
+
+`fees_collector: "stripe"` means `application_fee_amount` is the platform's fee
+alone; Stripe deducts its own processing fee separately. Do not switch to
+`application` without reworking the fee maths.
 
 ### A direct charge through Checkout
 
@@ -109,37 +132,58 @@ the session back. Do **not** set `transfer_data` on a direct charge.
 export async function POST(request: Request) {
   const body = await request.text()
   const signature = request.headers.get("stripe-signature")
-  if (!signature) return new Response("Missing signature", { status: 400 })
+  const secret = process.env.STRIPE_WEBHOOK_SECRET
+  if (!signature || !secret) {
+    return new Response("Missing Stripe signature", { status: 400 })
+  }
 
-  let event: Stripe.Event
+  let type: string
+  let accountId: string | undefined
+  let session: Stripe.Checkout.Session | undefined
+
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET ?? "",
-    )
+    // v1 events carry the object; v2 events are thin notifications that only
+    // reference it, and constructEvent rejects those outright.
+    if (isThinEventNotification(body)) {
+      const notification = stripe.parseEventNotification(
+        body,
+        signature,
+        secret,
+      ) as unknown as { type: string; related_object?: { id?: string } | null }
+      type = notification.type
+      accountId = notification.related_object?.id
+    } else {
+      const event = stripe.webhooks.constructEvent(body, signature, secret)
+      type = event.type
+      if (event.type === "checkout.session.completed") {
+        session = event.data.object as Stripe.Checkout.Session
+      }
+    }
   } catch {
     return new Response("Invalid signature", { status: 400 })
   }
 
-  switch (event.type) {
-    case "checkout.session.completed": {
-      const session = event.data.object as Stripe.Checkout.Session
+  try {
+    if (ACCOUNT_EVENT_TYPES.has(type)) {
+      if (!accountId) return new Response("ok", { status: 200 })
+      const flags = await fetchAccountFlags(accountId) // null if unknown
+      if (flags) await syncAccount(accountId, flags)
+    } else if (type === "checkout.session.completed" && session) {
       const orderId = session.metadata?.orderId
       if (!orderId) return new Response("Ignored", { status: 200 }) // not ours
       await markOrderPaid(orderId, session.id)
-      return new Response("ok", { status: 200 })
     }
-    case "account.updated": {
-      const account = event.data.object as Stripe.Account
-      await syncAccount(account) // unknown accounts are ignored
-      return new Response("ok", { status: 200 })
-    }
-    default:
-      return new Response("Ignored", { status: 200 })
+  } catch {
+    return new Response("server_error", { status: 500 }) // Stripe retries
   }
+
+  return new Response("ok", { status: 200 })
 }
 ```
+
+`isThinEventNotification` just JSON-parses the body and checks
+`object === "v2.core.event"`. It never feeds the parsed value into the handler —
+the signature is still verified against the raw body afterwards.
 
 ### Register the endpoint (once, production only)
 
@@ -148,10 +192,20 @@ node --env-file=.env.local scripts/create-webhook.mjs
 ```
 
 The script calls `stripe.webhookEndpoints.create({ url, connect: true,
-enabled_events: ["checkout.session.completed", "account.updated"] })` and
+enabled_events: ["checkout.session.completed", "account.updated",
+                 "v2.core.account[requirements].updated",
+                 "v2.core.account[configuration.merchant].updated",
+                 "v2.core.account[configuration.merchant].capability_status_updated"] })` and
 prints the signing secret, which is shown once. Register the **production**
 Vercel URL — preview deployments are login-protected, so Stripe cannot reach
 them.
+
+Webhook endpoints on this platform are registered as **snapshot** destinations
+(`event_payload: "snapshot"`), and Stripe accepts both the v1 and the v2
+spelling of an account change. Subscribe to both: the handler treats
+`account.updated` and `v2.core.account[requirements].updated` the same way.
+If `create` rejects the v2 names, register with `account.updated` alone — the
+handler still syncs from it.
 
 ## Environment
 
@@ -167,6 +221,15 @@ them.
 - **Preview URLs cannot receive webhooks.** Vercel password-protects them.
 - **`charges_enabled` lags onboarding.** Do not offer Buy Now until it is true,
   and re-check it when `/connect` loads — the redirect back can beat the webhook.
+- **v2 events are thin.** They carry `related_object`, not `data.object`, and
+  their `type` names are outside the v1 `Stripe.Event` union.
+- **`constructEvent` rejects thin events.** It throws "You passed a thin event
+  notification…" for any payload with `object: "v2.core.event"`, so a handler
+  that only calls `constructEvent` answers `400` to every Accounts v2 event and
+  Stripe retries it forever. Branch on the payload shape and use
+  `stripe.parseEventNotification` for the thin ones.
+- **Reserve domains are rejected as `business_url`.** `example.com` fails with
+  "Invalid URL"; use a normal-looking domain.
 - **A shared sandbox means foreign events.** Filter on `metadata.orderId` and on
   a `stripe_account_id` we stored; never trust an event just because it arrived.
 - **Test cards.** `4242 4242 4242 4242`, any future expiry, any CVC, any ZIP.
