@@ -20,8 +20,17 @@ Bonus: keyword search, email the seller on message.
 
 ```bash
 npm install
-cp .env.example .env.local   # then fill in SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY
+printf 'SUPABASE_URL=\nSUPABASE_PUBLISHABLE_KEY=\n' > .env.local  # then fill in both
 npm run dev                  # http://localhost:3000
+```
+
+`.env.local` is gitignored. Both values come from the Supabase dashboard
+(Project Settings -> API) and stay server-only — never prefix them with
+`NEXT_PUBLIC_`:
+
+```bash
+SUPABASE_URL=https://<project>.supabase.co
+SUPABASE_PUBLISHABLE_KEY=<publishable-or-anon-key>
 ```
 
 Apply `DATABASE.md` in the Supabase SQL editor before creating listings.

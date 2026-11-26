@@ -18,9 +18,9 @@ Path alias: `@/*` → `src/*`. `cn()` from `@/lib/utils`.
 
 ## Environment
 
-`.env.local` (gitignored), copied from `.env.example`. The browser never talks to
-Supabase directly, so all Supabase variables are **server-only** — do not prefix
-them with `NEXT_PUBLIC_`.
+`.env.local` (gitignored) holds the two variables below. The browser never talks
+to Supabase directly, so all Supabase variables are **server-only** — do not
+prefix them with `NEXT_PUBLIC_`.
 
 ```bash
 SUPABASE_URL=https://<project>.supabase.co
