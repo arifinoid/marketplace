@@ -5,7 +5,7 @@ listing and message a seller, and everything is public.
 
 Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 
-**Status:** M1 + M2 + M3 + M4 + M5 + M6 done.
+**Status:** M1 + M2 + M3 + M4 + M5 + M6 + M7 done (deploy pending).
 
 - **M1** — Next.js 15 + Tailwind v4 + shadcn `base-nova` scaffold, theme tokens,
   app shell (sidebar + header). Verified: typecheck / lint / build / SSR smoke.
@@ -35,6 +35,11 @@ Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
   Unknown or malformed ids hit the custom `app/not-found.tsx` with a real `404`.
   Verified live: detail `200`, message `201` with the derived recipient, message
   list `200`, unknown listing `404`.
+- **M7** — Verify: the four gates (`typecheck`, `lint`, unit tests, `build`) plus
+  an HTTP smoke matrix against the real Supabase project, and a CI workflow
+  (`.github/workflows/ci.yml`) that runs the same gates on push/PR. Verified:
+  typecheck clean, lint exit 0, 42/42 tests, build clean, 17/17 smoke checks as
+  expected. Deploy still pending (Vercel import from the default branch).
 
 ## Done criteria
 
