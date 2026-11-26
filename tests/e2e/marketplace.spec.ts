@@ -99,3 +99,18 @@ test("a visitor can create a listing with a photo", async ({ page }) => {
   await expect(page.getByText(`$${price}`)).toBeVisible()
   await expect(page.getByText("e2e-seller@example.com")).toBeVisible()
 })
+
+test("the shell links to the create flow", async ({ page }) => {
+  await page.goto("/")
+
+  // Without this entry point `/create` is only reachable by typing the URL.
+  await page.getByRole("link", { name: "Create new listing" }).click()
+  await expect(page).toHaveURL(/\/create$/)
+  await expect(
+    page.getByRole("heading", { name: "Choose listing type" }),
+  ).toBeVisible()
+  await expect(page.getByRole("link", { name: "Item for sale" })).toHaveAttribute(
+    "href",
+    "/create/item",
+  )
+})

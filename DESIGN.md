@@ -43,12 +43,15 @@ shadows — elevation is a 1 px border plus a small shadow on hover.
 ## App shell
 
 - Fixed **left sidebar** (288 px) + scrolling **main** area.
-- Sidebar: blue circular "F" logo + "Marketplace" wordmark, then a "Categories"
-  label and the 19-category vertical nav. Active category = `--color-fb-soft`
-  background + blue text.
+- Sidebar: blue circular "F" logo + "Marketplace" wordmark, a full-width
+  primary **Create new listing** button (Plus icon, `--color-fb`), then a
+  "Categories" label and the 19-category vertical nav. Active category =
+  `--color-fb-soft` background + blue text.
 - Header/top-right: decorative mail, bell, and profile icons (out of scope).
 - Mobile: sidebar collapses to a top bar with a hamburger drawer; the grid goes
-  to 1–2 columns.
+  to 1–2 columns. The drawer repeats the logo and the **Create new listing**
+  button above the category nav, so the create flow is reachable at every
+  breakpoint.
 
 ## Screens
 

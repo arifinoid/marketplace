@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { CategoryNav } from "./category-nav"
+import { CreateListingButton } from "./create-listing-button"
 import { Logo } from "./logo"
 
 export function MobileNav() {
@@ -21,12 +22,13 @@ export function MobileNav() {
       >
         <MenuIcon />
       </DialogTrigger>
-      <DialogContent className="sm:max-w-xs">
+      <DialogContent className="flex flex-col gap-5 sm:max-w-xs">
         <DialogHeader>
           <DialogTitle>
             <Logo />
           </DialogTitle>
         </DialogHeader>
+        <CreateListingButton />
         <Suspense fallback={null}>
           <CategoryNav />
         </Suspense>
