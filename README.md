@@ -89,7 +89,22 @@ project. Change it if the database moves region.
 
 ## Performance
 
-`GET /api/listings`, `GET /api/listings/[id]` and `/` are anonymously readable
-and change only when someone posts, so they carry
-`Cache-Control: public, s-maxage=10, stale-while-revalidate=59` and are served
-from the Vercel CDN. The policy lives in `src/lib/api/cache-policy.ts`.
+`GET /api/listings` and `GET /api/listings/[id]` are anonymously readable and
+change only when someone posts, so they carry
+`Cache-Control: public, s-maxage=10, stale-while-revalidate=59` and are cached
+by the Vercel CDN. The policy lives in `src/lib/api/cache-policy.ts`.
+
+```bash
+curl -sD - -o /dev/null \
+  https://arifinoid-marketplace.vercel.app/api/listings?category=electronics
+```
+
+`x-vercel-cache` goes `MISS` → `HIT` (then `STALE` once the 10s freshness
+expires) and `x-vercel-id` shows `hnd1`, because `vercel.json` pins the
+functions to Tokyo next to the Supabase project. Measured from Jakarta: a cold
+request is ~0.3s and a cached one ~0.1s, down from 1.2–1.7s before the region
+and cache work.
+
+`/` is rendered per request (`force-dynamic`, so the CDN does not cache it) and
+answers in ~0.3s. Caching it would need incremental static regeneration, which
+is deliberately not used because the build must not touch Supabase.

@@ -60,15 +60,18 @@ export async function listListings(
 
   let query = supabase
     .from("listings")
-    .select("*, category:categories(slug,name)", { count: "exact" })
+    .select("*, category:categories!inner(slug,name)", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1)
 
-  // Filter on the embedded category so the slug resolves inside PostgREST.
-  // A separate `categories` lookup here would cost an extra round trip on
-  // every request, which dominates the response time from a remote function.
+  // Filter on the embedded category so the slug resolves inside PostgREST and
+  // no separate `categories` lookup (an extra round trip on every request) is
+  // needed. `!inner` above is load bearing: PostgREST embeds are left joins by
+  // default, so without the hint `category.slug` only nulls out the embed and
+  // the parent rows are never restricted. `listings.category_id` is NOT NULL,
+  // so the inner join cannot drop a listing.
   if (params.category) {
-    query = query.eq("categories.slug", params.category)
+    query = query.eq("category.slug", params.category)
   }
 
   const q = escapeSearch(params.q ?? "")
