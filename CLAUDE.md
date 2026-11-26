@@ -76,6 +76,8 @@ Project skills live in `.agents/skills/` and are pinned by `skills-lock.json`:
 
 - `supabase`, `supabase-postgres-best-practices` — load before any schema, RLS,
   migration, index, or Supabase client work.
+- `stripe-connect` — load before any Stripe work: Connect onboarding, direct
+  charges, application fees, Checkout, webhook signature verification.
 - `better-accessibility`, `better-colors`, `better-layout`, `better-motion`,
   `better-typography`, `better-ui`, `better-interface`, `better-writing`,
   `interface-review`, `build-design` — design review for UI work.
