@@ -5,9 +5,14 @@ listing and message a seller, and everything is public.
 
 Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 
-**Status:** M1 (foundation) done — Next.js 15 + Tailwind v4 + shadcn `base-nova`
-scaffold, theme tokens, and app shell (sidebar + header) verified with
-typecheck / lint / build / SSR smoke.
+**Status:** M1 + M2 done.
+
+- **M1** — Next.js 15 + Tailwind v4 + shadcn `base-nova` scaffold, theme tokens,
+  app shell (sidebar + header). Verified: typecheck / lint / build / SSR smoke.
+- **M2** — Supabase data layer: `supabase/schema.sql`, lazy server client,
+  domain types, pure validation + formatting, query builders, API client /
+  response helpers, and 22 unit tests. Verified: typecheck / lint / tests /
+  build. Live DB calls still need `.env.local` + the schema applied.
 
 ## Done criteria
 

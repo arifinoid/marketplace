@@ -176,6 +176,15 @@ create policy "messages are readable by everyone"
 create policy "anyone can send messages"
   on public.messages for insert to anon with check (true);
 
+-- ---------- Data API exposure ----------------------------------------------
+-- Since 2026-04-28 new public-schema tables are not auto-exposed to the Data
+-- API. Grant the anon role access explicitly (RLS still applies row-level).
+
+grant usage on schema public to anon;
+grant select on public.categories to anon;
+grant select, insert on public.listings to anon;
+grant select, insert on public.messages to anon;
+
 -- ---------- Storage ---------------------------------------------------------
 
 insert into storage.buckets (id, name, public)
@@ -190,6 +199,9 @@ create policy "anyone can upload listing images"
   on storage.objects for insert to anon
   with check (bucket_id = 'listing-images');
 ```
+
+The same SQL lives in `supabase/schema.sql` (canonical file for the Supabase
+CLI); keep the two in sync.
 
 ## Notes / follow-ups
 
