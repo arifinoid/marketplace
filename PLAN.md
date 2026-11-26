@@ -5,6 +5,10 @@ listing and message a seller, and everything is public.
 
 Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 
+**Status:** M1 (foundation) done — Next.js 15 + Tailwind v4 + shadcn `base-nova`
+scaffold, theme tokens, and app shell (sidebar + header) verified with
+typecheck / lint / build / SSR smoke.
+
 ## Done criteria
 
 The build passes when all four work on the live site:
