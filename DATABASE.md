@@ -5,8 +5,9 @@ Source of truth for the database. Apply the SQL in the Supabase SQL editor
 the `pgcrypto` extension for `gen_random_uuid()`.
 
 The schema is intentionally small: a fixed category list, listings, messages,
-and one public storage bucket. There is **no auth** in this iteration, so the
-only role that needs access is `anon` (the role mapped to the publishable key).
+Stripe Connect accounts, and one public storage bucket. There is **no auth** in
+this iteration, so the only role that needs access is `anon` (the role mapped to
+the publishable key).
 
 ## Tables
 
@@ -49,6 +50,35 @@ display label; `sort_order` controls nav order.
 | `message`      | text        | not null, `check (char_length(message) > 0)` |
 | `created_at`   | timestamptz | not null, default `now()`                    |
 
+### `stripe_accounts`
+
+Test 4. Maps one seller email (the same one on their listings) to a Stripe
+Connect account. `seller_email` and `stripe_account_id` are both unique, so a
+retry cannot create a second account for one seller.
+
+| column              | type         | notes                              |
+|---------------------|--------------|------------------------------------|
+| `id`                | uuid         | PK, default `gen_random_uuid()`    |
+| `seller_email`      | varchar(255) | not null, unique                   |
+| `stripe_account_id` | varchar(255) | not null, unique                   |
+| `created_at`        | timestamptz  | not null, default `now()`          |
+
+### `stripe_account_events`
+
+Append-only log of the onboarding flags Stripe reported for a Connect account.
+The newest row is the current state. It is a log rather than a column on
+`stripe_accounts` so the schema stays INSERT-only — an UPDATE policy would let
+anyone rewrite `stripe_account_id` and divert buyers' payments.
+
+| column              | type         | notes                              |
+|---------------------|--------------|------------------------------------|
+| `id`                | uuid         | PK, default `gen_random_uuid()`    |
+| `stripe_account_id` | varchar(255) | not null, no FK (unknown ids are dropped) |
+| `charges_enabled`   | boolean      | not null, default `false`          |
+| `details_submitted` | boolean      | not null, default `false`          |
+| `payouts_enabled`   | boolean      | not null, default `false`          |
+| `created_at`        | timestamptz  | not null, default `now()`          |
+
 ## Storage
 
 One public bucket, `listing-images`, for listing photos. Uploads go through
@@ -63,9 +93,12 @@ RLS is enabled on every table. The anon role gets **read + insert only**:
 - `categories`: SELECT
 - `listings`: SELECT, INSERT
 - `messages`: SELECT, INSERT
+- `stripe_accounts`: SELECT, INSERT
+- `stripe_account_events`: SELECT, INSERT
 - `storage.objects`: SELECT, INSERT (bucket `listing-images`)
 
-No UPDATE/DELETE policies exist. If auth is added later, replace the blanket
+No UPDATE/DELETE policies exist, including on the Stripe tables — onboarding
+state is appended, never rewritten. If auth is added later, replace the blanket
 insert policies with ownership checks (e.g. `seller_email = jwt claim`) and add
 update/delete policies then.
 
@@ -139,6 +172,35 @@ create table public.messages (
 
 create index messages_listing_id_idx on public.messages (listing_id, created_at desc);
 
+-- ---------- Stripe connect accounts -----------------------------------------
+-- Test 4. A seller is identified by the email on their listings, so one row
+-- here maps that email to a Stripe Connect account. Onboarding state is an
+-- append-only event log rather than an editable column: it keeps the whole
+-- schema INSERT-only, so no UPDATE policy is needed and the webhook cannot
+-- rewrite an account id.
+
+create table if not exists public.stripe_accounts (
+  id                uuid primary key default gen_random_uuid(),
+  seller_email      varchar(255) not null unique,
+  stripe_account_id varchar(255) not null unique,
+  created_at        timestamptz not null default now()
+);
+
+create index if not exists stripe_accounts_stripe_account_id_idx
+  on public.stripe_accounts (stripe_account_id);
+
+create table if not exists public.stripe_account_events (
+  id                uuid primary key default gen_random_uuid(),
+  stripe_account_id varchar(255) not null,
+  charges_enabled   boolean not null default false,
+  details_submitted boolean not null default false,
+  payouts_enabled   boolean not null default false,
+  created_at        timestamptz not null default now()
+);
+
+create index if not exists stripe_account_events_lookup_idx
+  on public.stripe_account_events (stripe_account_id, created_at desc);
+
 -- ---------- updated_at trigger ---------------------------------------------
 
 create or replace function public.set_updated_at()
@@ -157,9 +219,11 @@ create trigger listings_set_updated_at
 
 -- ---------- Row Level Security ---------------------------------------------
 
-alter table public.categories enable row level security;
-alter table public.listings   enable row level security;
-alter table public.messages   enable row level security;
+alter table public.categories           enable row level security;
+alter table public.listings             enable row level security;
+alter table public.messages             enable row level security;
+alter table public.stripe_accounts      enable row level security;
+alter table public.stripe_account_events enable row level security;
 
 create policy "categories are readable by everyone"
   on public.categories for select to anon using (true);
@@ -176,6 +240,20 @@ create policy "messages are readable by everyone"
 create policy "anyone can send messages"
   on public.messages for insert to anon with check (true);
 
+create policy "stripe accounts are readable by everyone"
+  on public.stripe_accounts for select to anon using (true);
+
+create policy "the server can create connect accounts"
+  on public.stripe_accounts for insert to anon with check (true);
+
+create policy "stripe account events are readable by everyone"
+  on public.stripe_account_events for select to anon using (true);
+
+-- The webhook appends onboarding state; it never rewrites an account, so this
+-- stays an insert-only table like every other one here.
+create policy "the webhook can append account events"
+  on public.stripe_account_events for insert to anon with check (true);
+
 -- ---------- Data API exposure ----------------------------------------------
 -- Since 2026-04-28 new public-schema tables are not auto-exposed to the Data
 -- API. Grant the anon role access explicitly (RLS still applies row-level).
@@ -184,6 +262,8 @@ grant usage on schema public to anon;
 grant select on public.categories to anon;
 grant select, insert on public.listings to anon;
 grant select, insert on public.messages to anon;
+grant select, insert on public.stripe_accounts to anon;
+grant select, insert on public.stripe_account_events to anon;
 
 -- ---------- Storage ---------------------------------------------------------
 
@@ -213,3 +293,9 @@ CLI); keep the two in sync.
   succeed before the listing is created.
 - For local development, run the same SQL against the Supabase CLI's local
   stack (`supabase db reset`) or paste it into the hosted SQL editor.
+- `stripe_accounts` / `stripe_account_events` exist so the app can record a
+  Connect account. They are public *read* by default like every other table, so
+  `/connect` and `/api/connect/status` work without auth; nothing here is secret
+  (a Stripe account id is not a credential). The webhook only appends rows for
+  account ids the app already created, which is what keeps the shared sandbox
+  from writing other candidates' sellers into this table.

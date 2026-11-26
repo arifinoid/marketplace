@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { CategoryNav } from "./category-nav"
+import { ConnectStripeButton } from "./connect-stripe-button"
 import { CreateListingButton } from "./create-listing-button"
 import { Logo } from "./logo"
 
@@ -29,6 +30,7 @@ export function MobileNav() {
           </DialogTitle>
         </DialogHeader>
         <CreateListingButton />
+        <ConnectStripeButton />
         <Suspense fallback={null}>
           <CategoryNav />
         </Suspense>

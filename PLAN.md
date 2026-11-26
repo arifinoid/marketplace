@@ -5,8 +5,8 @@ listing and message a seller, and everything is public.
 
 Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 
-**Status:** M1 + M2 + M3 + M4 + M5 + M6 + M7 + M8 done; Test 4 (Stripe
-Connect) planned as M9–M12 below. Live at
+**Status:** M1 + M2 + M3 + M4 + M5 + M6 + M7 + M8 + M9 done; Test 4 (Stripe
+Connect) is M9–M12 below, with M10 in progress. Live at
 <https://arifinoid-marketplace.vercel.app/>.
 
 - **M1** — Next.js 15 + Tailwind v4 + shadcn `base-nova` scaffold, theme tokens,
@@ -77,9 +77,13 @@ their listings (still no auth); Sold is derived from a paid `orders` row, so
 
 - **M9** — Stripe foundation: `stripe` SDK, a server-only client, money/fee
   helpers, unit tests. Verified: 54/54 unit tests, typecheck / lint / build.
-- **M10** — Seller onboarding: `stripe_accounts` table, `/connect`,
+- **M10** — Seller onboarding: `stripe_accounts` + `stripe_account_events`
+  tables (INSERT-only, so no UPDATE policy), `/connect`,
   `POST /api/connect/account-link`, `GET /api/connect/status`, the
-  `account.updated` webhook, and the sidebar entry.
+  `account.updated` webhook, the sidebar/drawer entry, and 14 more unit tests
+  (68 total). Verified: typecheck / lint / 68 tests / build. Live onboarding
+  still needs the schema applied, `STRIPE_SECRET_KEY`, and the webhook
+  endpoint registered in Stripe.
 - **M11** — Checkout: `orders` table, Buy Now, `POST /api/checkout`,
   `/checkout/success` + `/checkout/cancel`, the `checkout.session.completed`
   webhook, and the Sold badge.
@@ -114,7 +118,9 @@ Bonus (optional): keyword search; email the seller when a message arrives.
 
 - Accounts, login, sessions, or ownership.
 - Edit / delete / mark-as-sold listings.
-- Multiple photos per listing, payments, real-time chat, reviews, moderation.
+- Multiple photos per listing, real-time chat, reviews, moderation.
+- Payments are sandbox-only (Test 4, M9–M12): test keys, no real money, no
+  payouts to real bank accounts.
 - Search beyond a simple keyword match.
 
 ## Milestones
