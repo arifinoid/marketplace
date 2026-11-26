@@ -33,9 +33,9 @@ shadows — elevation is a 1 px border plus a small shadow on hover.
 }
 ```
 
-- **Typography:** Inter via `next/font/google` (body), system-ui fallback. The
-  mockup's rounded display face is a mockup artifact; Inter keeps the build
-  neutral and readable.
+- **Typography:** Geist via `next/font/google` (CSS var `--font-sans`), system
+  fallback. The mockup's rounded display face is a mockup artifact; Geist is the
+  shadcn default and keeps the build neutral.
 - **Spacing:** 4 px base grid; card gap 16 px; screen padding 16–24 px.
 - **Radius:** cards 16 px, inputs/buttons 8–12 px, pills 999 px.
 - **Focus:** visible ring in `--color-fb` on every interactive element.
