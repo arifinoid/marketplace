@@ -10,20 +10,36 @@ import {
 import { insertOrder } from "@/lib/orders/queries"
 
 /**
- * Accounts v2 event type names are outside the v1 `Stripe.Event` union, so the
- * thin notification is handled through this wider shape.
+ * Accounts v2 event type names are outside the v1 `Stripe.Event` union, and a
+ * thin notification replaces `data.object` with a `related_object` reference,
+ * so both shapes are handled through these wider types.
  */
+type WebhookEvent = Omit<Stripe.Event, "type"> & {
+  type: string
+  related_object?: { id?: string }
+}
+
 type ThinNotification = {
   type: string
   related_object?: { id?: string } | null
+  fetchRelatedObject?: () => Promise<unknown>
 }
 
-/** The account events this endpoint subscribes to. */
+/**
+ * The account events this endpoint subscribes to. `account.updated` is the v1
+ * spelling of the same change: whether Stripe delivers a v2 account update
+ * under that name or under the v2 one depends on how the destination was
+ * registered, and both carry the same account id.
+ */
 const ACCOUNT_EVENT_TYPES = new Set([
+  "account.updated",
   "v2.core.account[requirements].updated",
   "v2.core.account[configuration.merchant].updated",
   "v2.core.account[configuration.merchant].capability_status_updated",
 ])
+
+const CHECKOUT_SESSION_COMPLETED = "checkout.session.completed"
+const THIN_CHECKOUT_SESSION_COMPLETED = "v1.checkout.session.completed"
 
 /**
  * Stripe webhook. Registered as a Connect endpoint (`connect: true`) because
@@ -44,25 +60,27 @@ export async function POST(request: Request) {
   let type: string
   let accountId: string | undefined
   let session: Stripe.Checkout.Session | undefined
+  let notification: ThinNotification | undefined
 
   try {
     if (isThinEventNotification(body)) {
-      // v1 events carry the object; a thin notification only references it.
-      const notification = getStripe().parseEventNotification(
+      const parsed = getStripe().parseEventNotification(
         body,
         signature,
         secret,
       ) as unknown as ThinNotification
-      type = notification.type
-      accountId = notification.related_object?.id
+      notification = parsed
+      type = parsed.type
+      accountId = parsed.related_object?.id
     } else {
       const event = getStripe().webhooks.constructEvent(
         body,
         signature,
         secret,
-      ) as Stripe.Event
+      ) as WebhookEvent
       type = event.type
-      if (event.type === "checkout.session.completed") {
+      accountId = readAccountId(event)
+      if (type === CHECKOUT_SESSION_COMPLETED) {
         session = event.data.object as Stripe.Checkout.Session
       }
     }
@@ -71,10 +89,25 @@ export async function POST(request: Request) {
     return new Response("Invalid signature", { status: 400 })
   }
 
+  // A thin notification only references its resource, so a session delivered
+  // that way has to be read back before an order can be recorded from it.
+  if (
+    !session &&
+    notification?.fetchRelatedObject &&
+    type === THIN_CHECKOUT_SESSION_COMPLETED
+  ) {
+    try {
+      session = (await notification.fetchRelatedObject()) as Stripe.Checkout.Session
+    } catch (error) {
+      console.error("Stripe webhook related object fetch failed:", error)
+      return new Response("server_error", { status: 500 })
+    }
+  }
+
   try {
     if (ACCOUNT_EVENT_TYPES.has(type)) {
       await handleAccountEvent(accountId)
-    } else if (type === "checkout.session.completed" && session) {
+    } else if (session) {
       await handleCheckoutSessionCompleted(session)
     }
     // Anything else is acknowledged so Stripe does not retry it.
@@ -86,6 +119,12 @@ export async function POST(request: Request) {
   }
 
   return new Response("ok", { status: 200 })
+}
+
+/** The account an event is about, from either the snapshot or the reference. */
+function readAccountId(event: WebhookEvent): string | undefined {
+  const object = event.data?.object as { id?: string } | undefined
+  return object?.id ?? event.related_object?.id
 }
 
 /**

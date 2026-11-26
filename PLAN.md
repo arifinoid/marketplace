@@ -111,15 +111,22 @@ their listings (still no auth); Sold is derived from a paid `orders` row, so
   derived from the `card_payments` capability status. The first version called
   `constructEvent` for everything, which rejects a thin notification outright —
   the handler now branches on the payload shape (`isThinEventNotification`) and
-  uses `parseEventNotification` for `v2.core.event`. Verified: typecheck /
-  lint / 102 tests / build, `/api/connect/account-link` returns a real
-  `connect.stripe.com/setup/e/acct_…` URL locally, `/api/connect/status`
+  uses `parseEventNotification` for `v2.core.event`, and it also accepts the v1
+  `account.updated` spelling, which some destination configurations deliver
+  instead. `scripts/create-webhook.mjs` registers the endpoint. Verified:
+  typecheck / lint / 102 tests / build, `/api/connect/account-link` returns a
+  real `connect.stripe.com/setup/e/acct_…` URL locally, `/api/connect/status`
   reads the account back, a Checkout session with `application_fee_amount` is
   accepted on a v2 account, and a signed
   `v2.core.account[requirements].updated` delivery is answered `200` and
   appends a `stripe_account_events` row (a classic `checkout.session.completed`
-  is still `200`, a bad signature is `400`). A completed payment still needs a
-  seller to finish the hosted onboarding form.
+  is still `200`, a bad signature is `400`). A signed classic
+  `checkout.session.completed` with `payment_status: paid` inserts the `orders`
+  row (1000 cents, 100 fee), flips the listing to `sold: true`, and a retried
+  delivery leaves one row; a thin `v1.checkout.session.completed` resolves its
+  session through `fetchRelatedObject` and is acknowledged without an order
+  while the session is unpaid. A completed payment still needs a seller to
+  finish the hosted onboarding form.
 
 ## Done criteria
 

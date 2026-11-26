@@ -198,14 +198,17 @@ bytes. It branches on `isThinEventNotification(body)`
 latter rejects a thin notification outright. Events handled:
 `v2.core.account[requirements].updated`,
 `v2.core.account[configuration.merchant].updated`,
-`v2.core.account[configuration.merchant].capability_status_updated` (append
-flags for accounts this app created) and `checkout.session.completed` (record
-the order). Unknown accounts are dropped: the sandbox is shared, so the
-endpoint also receives events for other candidates' sellers.
+`v2.core.account[configuration.merchant].capability_status_updated`, and
+`account.updated` — the v1 spelling of the same change, which some destination
+configurations deliver instead (append flags for accounts this app created) —
+plus `checkout.session.completed` (record the order). Unknown accounts are
+dropped: the sandbox is shared, so the endpoint also receives events for other
+candidates' sellers.
 
-Accounts v2 events are *thin* — they carry a `related_object` reference instead
-of the account, so the handler re-reads the account from Stripe
-(`fetchAccountFlags`) before appending a `stripe_account_events` row.
+Accounts v2 events carry a `related_object` reference instead of the account
+itself, so the handler re-reads the account from Stripe (`fetchAccountFlags`)
+before appending a `stripe_account_events` row. A classic `account.updated`
+carries the account in `data.object`; `readAccountId` accepts either.
 
 The order handler reads `listingId` / `stripeAccountId` / `feeCents` from the
 session **metadata**, which our own server wrote when it created the session —

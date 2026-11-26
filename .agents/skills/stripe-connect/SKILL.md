@@ -192,13 +192,20 @@ node --env-file=.env.local scripts/create-webhook.mjs
 ```
 
 The script calls `stripe.webhookEndpoints.create({ url, connect: true,
-enabled_events: ["checkout.session.completed",
+enabled_events: ["checkout.session.completed", "account.updated",
                  "v2.core.account[requirements].updated",
                  "v2.core.account[configuration.merchant].updated",
                  "v2.core.account[configuration.merchant].capability_status_updated"] })` and
 prints the signing secret, which is shown once. Register the **production**
 Vercel URL — preview deployments are login-protected, so Stripe cannot reach
 them.
+
+Webhook endpoints on this platform are registered as **snapshot** destinations
+(`event_payload: "snapshot"`), and Stripe accepts both the v1 and the v2
+spelling of an account change. Subscribe to both: the handler treats
+`account.updated` and `v2.core.account[requirements].updated` the same way.
+If `create` rejects the v2 names, register with `account.updated` alone — the
+handler still syncs from it.
 
 ## Environment
 
