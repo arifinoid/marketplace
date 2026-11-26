@@ -141,7 +141,12 @@ their listings (still no auth); Sold is derived from a paid `orders` row, so
   listing with `4242 4242 4242 4242`: the success page confirmed, the `orders`
   row recorded 1234 cents with a 123-cent fee, the charge on the connected
   account succeeded with a 123-cent application fee, and the listing shows
-  `sold: true` — 7/7 checks. Screenshot in `docs/screenshots/checkout-success.png`.
+  `sold: true` — 7/7 checks. The screenshots the submission needs are in
+  `docs/screenshots/`: `onboarding.png` (Stripe's hosted onboarding page),
+  `buy-now.png` + `checkout.png` (the Buy Now card and the hosted Checkout),
+  `checkout-success.png`, and `order-supabase.png` (the `orders` row read back
+  from PostgREST); `connect-status.png` shows `/connect` for a connected seller.
+  Onboarding past its first page is hCaptcha-gated, so a person has to finish it.
 
 ## Done criteria
 

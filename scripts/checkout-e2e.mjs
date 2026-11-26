@@ -9,6 +9,10 @@
  * Sold flag. Requires SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in the
  * environment, and a seller whose Connect account has `charges_enabled`.
  *
+ * Writes four screenshots to docs/screenshots: `buy-now.png` (the listing with
+ * the Buy Now card), `checkout.png` (the hosted Checkout, card filled),
+ * `checkout-success.png`, and `order-supabase.png` (the saved `orders` row).
+ *
  * Onboarding itself is a Stripe-hosted form and is not automated: set
  * PAY_SELLER_EMAIL to an email that already finished it (check with
  * `/api/connect/status?email=…`).
@@ -76,6 +80,7 @@ record(
 // 2. Buy Now on the real page.
 await page.goto(`${base}/item/${listingId}`, { waitUntil: "networkidle" })
 await page.getByLabel("Buyer email").fill(buyerEmail)
+await page.screenshot({ path: "docs/screenshots/buy-now.png", fullPage: true })
 await Promise.all([
   page.waitForURL(/checkout\.stripe\.com/, { timeout: 60_000 }),
   page.getByRole("button", { name: "Buy Now" }).click(),
@@ -100,6 +105,7 @@ await payment.locator("input#payment-numberInput").fill("4242424242424242")
 await payment.locator("input#payment-expiryInput").fill("12/34")
 await payment.locator("input#payment-cvcInput").fill("123")
 await payment.locator("input#payment-nameInput").fill("Test Buyer")
+await page.screenshot({ path: "docs/screenshots/checkout.png", fullPage: true })
 
 /** Stripe moves the submit button between frames depending on the layout. */
 async function findPayButton() {
@@ -153,6 +159,36 @@ record(
 
 const after = await (await fetch(`${base}/api/listings/${listingId}`)).json()
 record("listing shows as Sold", after?.data?.sold === true, `sold=${after?.data?.sold}`)
+
+// A readable capture of the row Supabase actually holds — the tables are
+// INSERT-only, so this is the same view the SQL editor would give.
+const escapeHtml = (value) =>
+  String(value ?? "").replace(/[&<>]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[char]))
+const orderRows = Object.entries(order ?? {})
+  .map(([key, value]) => `<tr><th>${escapeHtml(key)}</th><td>${escapeHtml(value)}</td></tr>`)
+  .join("")
+const orderSource = `${rest}/orders?listing_id=eq.${listingId}&select=*`
+const orderPage = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+await orderPage.setContent(`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Supabase · orders</title>
+<style>
+  body { margin: 0; padding: 40px; background: #f6f8fa; color: #111827;
+         font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p { margin: 0 0 24px; color: #4b5563; font-family: ui-monospace, monospace; font-size: 12px; }
+  table { border-collapse: collapse; width: 100%; background: #fff;
+          border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e5e7eb;
+           font-family: ui-monospace, monospace; font-size: 13px; vertical-align: top; }
+  th { width: 240px; color: #374151; background: #f9fafb; font-weight: 600; }
+  tr:last-child th, tr:last-child td { border-bottom: 0; }
+</style></head><body>
+<h1>Supabase · public.orders</h1>
+<p>${escapeHtml(orderSource)}</p>
+<table>${orderRows || '<tr><th>status</th><td>no row saved</td></tr>'}</table>
+</body></html>`)
+await orderPage.screenshot({ path: "docs/screenshots/order-supabase.png", fullPage: true })
+await orderPage.close()
 
 await page.screenshot({ path: "docs/screenshots/checkout-success.png", fullPage: true })
 await browser.close()
