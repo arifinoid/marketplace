@@ -5,7 +5,7 @@ listing and message a seller, and everything is public.
 
 Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 
-**Status:** M1 + M2 + M3 + M4 + M5 done.
+**Status:** M1 + M2 + M3 + M4 + M5 + M6 done.
 
 - **M1** — Next.js 15 + Tailwind v4 + shadcn `base-nova` scaffold, theme tokens,
   app shell (sidebar + header). Verified: typecheck / lint / build / SSR smoke.
@@ -26,9 +26,15 @@ Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 - **M5** — Create: `/create` type picker (only *Item for sale* enabled) and the
   `/create/item` three-pane form (details, live preview, summary) with photo
   upload through `/api/upload`. Client validation mirrors the server rules;
-  submit posts the listing and redirects to `/item/[id]`. Verified: typecheck /
-  lint / tests / build + SSR smoke of both pages. Live submit still needs the
-  schema applied (tables + Storage bucket).
+  submit posts the listing and redirects to `/item/[id]`. Verified live: upload
+  `201` + public URL fetch `200`, `POST /api/listings` `201`, home grid renders
+  the new card.
+- **M6** — Detail & message: `/item/[id]` with photo, price, description,
+  location, listed-ago and seller information, plus the message form. Submit
+  calls `POST /api/messages`, which derives `seller_email` from the listing.
+  Unknown or malformed ids hit the custom `app/not-found.tsx` with a real `404`.
+  Verified live: detail `200`, message `201` with the derived recipient, message
+  list `200`, unknown listing `404`.
 
 ## Done criteria
 
