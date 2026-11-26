@@ -1,11 +1,14 @@
 export interface Category {
+  id?: string
   slug: string
   name: string
+  sort_order?: number
 }
 
 /**
  * Fixed category list shown in the sidebar and used to filter the grid.
- * Mirrors the seed in DATABASE.md; keep the order in sync with `sort_order`.
+ * Mirrors the seed in DATABASE.md / supabase/schema.sql; keep the order in
+ * sync with `sort_order`.
  */
 export const CATEGORIES: Category[] = [
   { slug: "vehicles", name: "Vehicles" },
@@ -28,3 +31,13 @@ export const CATEGORIES: Category[] = [
   { slug: "toys-games", name: "Toys & Games" },
   { slug: "buy-and-sell-groups", name: "Buy and sell groups" },
 ]
+
+export const CATEGORY_SLUGS: string[] = CATEGORIES.map((category) => category.slug)
+
+export function isCategorySlug(value: string): boolean {
+  return CATEGORY_SLUGS.includes(value)
+}
+
+export function findCategoryBySlug(slug: string): Category | undefined {
+  return CATEGORIES.find((category) => category.slug === slug)
+}
