@@ -49,13 +49,16 @@ src/
     globals.css                # @theme tokens
     create/page.tsx            # /create      listing-type picker
     create/item/page.tsx       # /create/item create form + preview
-    item/[id]/page.tsx         # /item/[id]   detail + message seller
+    item/[id]/page.tsx         # /item/[id]   detail + buy + message seller
     connect/page.tsx           # /connect     Stripe onboarding
+    checkout/success/page.tsx  # /checkout/success
+    checkout/cancel/page.tsx   # /checkout/cancel
     api/
       listings/route.ts        # GET, POST
       listings/[id]/route.ts   # GET
       messages/route.ts        # GET, POST
       upload/route.ts          # POST (multipart image → Storage)
+      checkout/route.ts               # POST (listing + email → Checkout URL)
       connect/account-link/route.ts  # POST (email → Stripe onboarding URL)
       connect/status/route.ts        # GET  (?email= → onboarding state)
       stripe/webhook/route.ts        # POST (Connect webhook)
@@ -73,6 +76,7 @@ src/
     listings/{types,validation,queries,format}.ts
     messages/{types,validation}.ts
     connect/{types,validation,queries,onboarding}.ts
+    orders/{types,validation,queries,checkout}.ts
     stripe/{server,money}.ts   # server-only SDK client + integer-cent math
     categories.ts              # slug <-> name helpers
     utils.ts                   # cn()
@@ -104,6 +108,10 @@ See `DATABASE.md` for the SQL. Summary:
 - `stripe_account_events(id, stripe_account_id, charges_enabled,
   details_submitted, payouts_enabled, created_at)` — append-only onboarding
   state; the newest row wins.
+- `orders(id, listing_id → listings on delete cascade, buyer_email,
+  stripe_checkout_session_id unique, stripe_account_id, amount_cents, fee_cents,
+  currency, status, created_at)` — a row is a paid checkout. Sold is derived
+  from its existence; `listings` never gets an UPDATE policy.
 - Storage bucket `listing-images` (public).
 
 `location` is a constant default (`'Palo Alto, CA'`), not a form field.
@@ -121,9 +129,24 @@ Base URL: same origin. All responses are JSON. Errors use
 | GET | `/api/messages` | `?listing_id=<uuid>` | `200 { data: Message[] }` | 400 |
 | POST | `/api/messages` | JSON body (below) | `201 { data: Message }` | 400, 404, 500 |
 | POST | `/api/upload` | multipart form, field `file` | `201 { data: { url } }` | 400, 413, 415 |
+| POST | `/api/checkout` | JSON `{ listing_id, buyer_email }` | `200 { data: { url } }` | 400, 409, 500 |
 | POST | `/api/connect/account-link` | JSON `{ email }` | `200 { data: { url } }` | 400, 500 |
 | GET | `/api/connect/status` | `?email=<email>` | `200 { data: ConnectStatus }` | 400, 500 |
 | POST | `/api/stripe/webhook` | raw Stripe body + `stripe-signature` | `200 "ok"` | 400, 500 |
+
+### POST `/api/checkout` body
+
+```json
+{
+  "listing_id": "<uuid>",
+  "buyer_email": "buyer@example.com"
+}
+```
+
+The seller is never taken from the client: the route loads the listing, reads
+its `seller_email`, and looks up that seller's Connect account. `409` means the
+listing is gone, already sold, or the seller has not finished onboarding — the
+message says which.
 
 ### POST `/api/connect/account-link` body
 
@@ -158,9 +181,18 @@ Registered as a **Connect** endpoint (`connect: true`), because direct charges
 emit their events from the connected account. The handler reads the body as
 text — `constructEvent` verifies the signature against the exact bytes, so
 parsing the JSON first would break verification. Events handled:
-`account.updated` (append flags for accounts this app created). Unknown
-accounts are dropped: the sandbox is shared, so the endpoint also receives
-events for other candidates' sellers.
+`account.updated` (append flags for accounts this app created) and
+`checkout.session.completed` (record the order). Unknown accounts are dropped:
+the sandbox is shared, so the endpoint also receives events for other
+candidates' sellers.
+
+The order handler reads `listingId` / `stripeAccountId` / `feeCents` from the
+session **metadata**, which our own server wrote when it created the session —
+the signature check is what makes that trustworthy. A session whose
+`payment_status` is not `paid` (bank transfer, installments) is acknowledged and
+ignored. `insertOrder` upserts on `stripe_checkout_session_id`, so a retried
+event is a no-op; a `23505` from the one-paid-order-per-listing index returns
+`null` instead of throwing, and the handler still answers `200`.
 
 ### POST `/api/listings` body
 
@@ -204,6 +236,8 @@ tested.
 | `message` | required, 1–2000 chars |
 | `listing_id` | required, UUID, must exist |
 | `email` (Connect) | required, RFC-ish email; trimmed + lowercased |
+| `listing_id` (checkout) | required, UUID, must exist and be unsold |
+| `buyer_email` (checkout) | required, RFC-ish email; trimmed + lowercased |
 
 Money is stored as `numeric(10,2)`; format with `Intl.NumberFormat('en-US', {
 style: 'currency', currency: 'USD' })` in `format.ts`, never with float math.
@@ -248,8 +282,20 @@ The listing is created only after the upload succeeds (photo is required).
   Submit = upload (if data URL / file not yet uploaded) → `POST /api/listings` →
   redirect to `/item/[id]`.
 - **`/item/[id]`** — photo, title, price, description, location, seller email,
-  and the **Message Seller** form. Submit = `POST /api/messages`; success shows
-  an inline confirmation and clears the form.
+  the **Message Seller** form, and — only when the seller has
+  `charges_enabled` and the listing is not sold — a **Buy Now** card. Buy Now
+  validates the email, posts to `/api/checkout`, then redirects the buyer to
+  Stripe; a `409` is shown inline instead of redirecting. A **Sold** badge sits
+  next to the title and on the grid card.
+- **`/checkout/success?session_id=…`** — confirmation plus the order amount,
+  buyer and listing title. Stripe can redirect back before the webhook has
+  recorded the order, so the page re-renders itself every 2 s (up to 10 times)
+  and shows a "Confirming your payment…" state until the row lands.
+- **`/checkout/cancel?session_id=…&listing_id=…`** — "You were not charged", with
+  a link back to the listing. Both checkout pages 404 without a `session_id`.
+- **Sold derivation** — `listListings` loads the sold flags in one extra query
+  (`orders` where `status = paid`), `getListing` with a single existence check;
+  there is no per-card query.
 - **States** — skeleton/spinner while loading; empty state with guidance; inline
   error with retry; success via `aria-live="polite"`.
 
@@ -273,6 +319,11 @@ The listing is created only after the upload succeeds (photo is required).
   body before doing anything; a missing or invalid signature is a `400`.
 - Money never touches floats: `numeric(10,2)` in Postgres, integer cents at the
   Stripe boundary.
+- The buyer never names the seller. `/api/checkout` derives `seller_email` from
+  the listing, so a forged body cannot send the platform fee to another account.
+- `orders` is INSERT-only: no refund or cancel path can rewrite a payment.
+- `POST /api/checkout` is not cached and `/api/listings/[id]` stopped being
+  CDN-cached, because both expose Sold / Buy-Now state that must be fresh.
 - Out of scope / accepted risk: no rate limiting or abuse controls (no auth).
 
 ## Testing
@@ -283,8 +334,10 @@ The listing is created only after the upload succeeds (photo is required).
   - price/date formatting
   - query building (category filter, search, ordering, pagination)
   - upload mime/size guard
-  - Stripe money math (string → integer cents, fee, payout; float traps)
+  - Stripe money math (string → integer cents, fee, payout, formatting; float traps)
   - Connect email validation and the onboarding query builders
+  - checkout validation, and the order queries (upsert idempotency, the
+    already-sold `23505` path, sold flags)
 - `vitest.config.mts` mirrors the `@` alias.
 - **Playwright**: `tests/e2e/marketplace.spec.ts` covers browse → category
   filter → detail → message seller, and create with a photo upload. Selectors

@@ -72,6 +72,18 @@ export async function recordAccountEvent(
   }
 }
 
+/**
+ * Whether this seller can take a payment right now. Buy Now stays hidden until
+ * Stripe has enabled charges, which can lag the redirect back from onboarding.
+ */
+export async function canAcceptPayments(email: string): Promise<boolean> {
+  const row = await findStripeAccountByEmail(email)
+  if (!row) return false
+
+  const flags = await getAccountStatus(row.stripe_account_id)
+  return flags?.charges_enabled === true
+}
+
 /** The most recent flags we recorded for an account, or null when none yet. */
 export async function getAccountStatus(
   stripeAccountId: string,

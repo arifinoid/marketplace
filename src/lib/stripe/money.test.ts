@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   PLATFORM_FEE_BPS,
+  formatCents,
   platformFeeCents,
   priceToCents,
   sellerPayoutCents,
@@ -49,6 +50,19 @@ describe("platformFeeCents", () => {
     for (const amount of [0, 1, 5, 99, 100, 2500, 9_999_999_999]) {
       expect(platformFeeCents(amount)).toBeLessThanOrEqual(amount)
     }
+  })
+})
+
+describe("formatCents", () => {
+  it("formats integer cents as US dollars", () => {
+    expect(formatCents(4250)).toBe("$42.50")
+    expect(formatCents(0)).toBe("$0.00")
+    expect(formatCents(7)).toBe("$0.07")
+  })
+
+  it("keeps the cents part two digits wide", () => {
+    expect(formatCents(101)).toBe("$1.01")
+    expect(formatCents(10_000)).toBe("$100.00")
   })
 })
 

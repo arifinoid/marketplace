@@ -1,5 +1,6 @@
 import { formatListedAgo, formatPrice } from "@/lib/listings/format"
 import type { Listing } from "@/lib/listings/types"
+import { Badge } from "@/components/ui/badge"
 
 interface ListingDetailProps {
   listing: Listing
@@ -21,9 +22,12 @@ export function ListingDetail({ listing, children }: ListingDetailProps) {
 
       <div className="flex min-w-0 flex-col gap-5">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {listing.title}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {listing.title}
+            </h1>
+            {listing.sold && <Badge variant="secondary">Sold</Badge>}
+          </div>
           <p className="text-xl font-semibold text-foreground">
             {formatPrice(listing.price)}
           </p>

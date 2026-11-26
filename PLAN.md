@@ -5,8 +5,8 @@ listing and message a seller, and everything is public.
 
 Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 
-**Status:** M1 + M2 + M3 + M4 + M5 + M6 + M7 + M8 + M9 done; Test 4 (Stripe
-Connect) is M9–M12 below, with M10 in progress. Live at
+**Status:** M1 + M2 + M3 + M4 + M5 + M6 + M7 + M8 + M9 + M10 done; Test 4
+(Stripe Connect) is M9–M12 below, with M11 in progress. Live at
 <https://arifinoid-marketplace.vercel.app/>.
 
 - **M1** — Next.js 15 + Tailwind v4 + shadcn `base-nova` scaffold, theme tokens,
@@ -86,7 +86,13 @@ their listings (still no auth); Sold is derived from a paid `orders` row, so
   endpoint registered in Stripe.
 - **M11** — Checkout: `orders` table, Buy Now, `POST /api/checkout`,
   `/checkout/success` + `/checkout/cancel`, the `checkout.session.completed`
-  webhook, and the Sold badge.
+  webhook, and the Sold badge. Direct charge on the connected account
+  (`{ stripeAccount }`, no `transfer_data`); Sold derived from a paid `orders`
+  row; `orders` is INSERT-only with a partial unique index so one listing can
+  only be sold once. Verified: typecheck / lint / 92 tests / build, plus a
+  production-server smoke (400 envelope, 409 for an unknown listing, 404 on
+  the checkout pages without a `session_id`). Live checkout still needs the
+  `orders` SQL applied and `STRIPE_WEBHOOK_SECRET`.
 - **M12** — Docs, verification and submission: `PLAN.md` / `SPECS.md` /
   `DESIGN.md` / `DATABASE.md`, screenshots, the four gates plus e2e, and the
   apply.capm.us form.
