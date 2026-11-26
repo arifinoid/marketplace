@@ -76,7 +76,7 @@ their listings (still no auth); Sold is derived from a paid `orders` row, so
 `listings` needs no UPDATE policy.
 
 - **M9** — Stripe foundation: `stripe` SDK, a server-only client, money/fee
-  helpers, unit tests.
+  helpers, unit tests. Verified: 54/54 unit tests, typecheck / lint / build.
 - **M10** — Seller onboarding: `stripe_accounts` table, `/connect`,
   `POST /api/connect/account-link`, `GET /api/connect/status`, the
   `account.updated` webhook, and the sidebar entry.
