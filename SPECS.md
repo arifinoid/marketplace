@@ -25,10 +25,19 @@ prefix them with `NEXT_PUBLIC_`.
 ```bash
 SUPABASE_URL=https://<project>.supabase.co
 SUPABASE_PUBLISHABLE_KEY=<publishable-or-anon-key>
+
+# Stripe (Test 4). The secret key stays server-only; the webhook secret is the
+# `whsec_...` value from the Stripe dashboard or `stripe listen`.
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+# Optional. Overrides the request host when building absolute URLs (Connect
+# account links, Checkout return URLs) on a deployment whose forwarded host is
+# not the public one.
+NEXT_PUBLIC_APP_URL=https://<public-host>
 ```
 
-Never commit a service-role key. The anon key + RLS is enough because the
-policies grant `anon` read + insert.
+Never commit a service-role key or a Stripe secret key. The anon key + RLS is
+enough for Supabase because the policies grant `anon` read + insert.
 
 ## Architecture
 
@@ -41,22 +50,30 @@ src/
     create/page.tsx            # /create      listing-type picker
     create/item/page.tsx       # /create/item create form + preview
     item/[id]/page.tsx         # /item/[id]   detail + message seller
+    connect/page.tsx           # /connect     Stripe onboarding
     api/
       listings/route.ts        # GET, POST
       listings/[id]/route.ts   # GET
       messages/route.ts        # GET, POST
       upload/route.ts          # POST (multipart image → Storage)
+      connect/account-link/route.ts  # POST (email → Stripe onboarding URL)
+      connect/status/route.ts        # GET  (?email= → onboarding state)
+      stripe/webhook/route.ts        # POST (Connect webhook)
   components/
     ui/                        # shadcn primitives
-    layout/                    # sidebar, header, category-nav
+    layout/                    # sidebar, header, category-nav, connect-stripe-button
     marketplace/               # listing-card, listing-grid, listing-form,
                                # message-form, photo-upload, states
+    connect/                   # connect-card (client)
   lib/
     supabase/server.ts         # server Supabase client (singleton)
     api/client.ts              # browser fetch wrapper for /api/*
     api/response.ts            # json() / error() helpers
+    api/origin.ts              # public origin for absolute URLs
     listings/{types,validation,queries,format}.ts
     messages/{types,validation}.ts
+    connect/{types,validation,queries,onboarding}.ts
+    stripe/{server,money}.ts   # server-only SDK client + integer-cent math
     categories.ts              # slug <-> name helpers
     utils.ts                   # cn()
 ```
@@ -82,6 +99,11 @@ See `DATABASE.md` for the SQL. Summary:
   image_url, location, created_at, updated_at)`
 - `messages(id, listing_id → listings on delete cascade, buyer_email,
   seller_email, message, created_at)`
+- `stripe_accounts(id, seller_email unique, stripe_account_id unique, created_at)`
+  — one Connect account per seller email.
+- `stripe_account_events(id, stripe_account_id, charges_enabled,
+  details_submitted, payouts_enabled, created_at)` — append-only onboarding
+  state; the newest row wins.
 - Storage bucket `listing-images` (public).
 
 `location` is a constant default (`'Palo Alto, CA'`), not a form field.
@@ -99,6 +121,46 @@ Base URL: same origin. All responses are JSON. Errors use
 | GET | `/api/messages` | `?listing_id=<uuid>` | `200 { data: Message[] }` | 400 |
 | POST | `/api/messages` | JSON body (below) | `201 { data: Message }` | 400, 404, 500 |
 | POST | `/api/upload` | multipart form, field `file` | `201 { data: { url } }` | 400, 413, 415 |
+| POST | `/api/connect/account-link` | JSON `{ email }` | `200 { data: { url } }` | 400, 500 |
+| GET | `/api/connect/status` | `?email=<email>` | `200 { data: ConnectStatus }` | 400, 500 |
+| POST | `/api/stripe/webhook` | raw Stripe body + `stripe-signature` | `200 "ok"` | 400, 500 |
+
+### POST `/api/connect/account-link` body
+
+```json
+{ "email": "wei@example.com" }
+```
+
+The email is trimmed and lowercased, then used to create (or reuse) an Express
+Connect account. The response `url` is a Stripe-hosted onboarding link whose
+`return_url` / `refresh_url` point back at `/connect?step=done|refresh&email=…`.
+
+### `GET /api/connect/status` response
+
+```json
+{
+  "data": {
+    "email": "wei@example.com",
+    "connected": true,
+    "chargesEnabled": true,
+    "detailsSubmitted": true,
+    "payoutsEnabled": true
+  }
+}
+```
+
+`connected` is false when no account row exists yet; the flags come from the
+newest `stripe_account_events` row.
+
+### POST `/api/stripe/webhook`
+
+Registered as a **Connect** endpoint (`connect: true`), because direct charges
+emit their events from the connected account. The handler reads the body as
+text — `constructEvent` verifies the signature against the exact bytes, so
+parsing the JSON first would break verification. Events handled:
+`account.updated` (append flags for accounts this app created). Unknown
+accounts are dropped: the sandbox is shared, so the endpoint also receives
+events for other candidates' sellers.
 
 ### POST `/api/listings` body
 
@@ -128,7 +190,8 @@ listing and copies its `seller_email`, so a buyer cannot spoof the recipient.
 
 ## Validation rules
 
-Pure functions in `src/lib/{listings,messages}/validation.ts`, unit tested.
+Pure functions in `src/lib/{listings,messages,connect}/validation.ts`, unit
+tested.
 
 | Field | Rule |
 |-------|------|
@@ -140,9 +203,13 @@ Pure functions in `src/lib/{listings,messages}/validation.ts`, unit tested.
 | `image_url` | required, `https:` URL (from `POST /api/upload`) |
 | `message` | required, 1–2000 chars |
 | `listing_id` | required, UUID, must exist |
+| `email` (Connect) | required, RFC-ish email; trimmed + lowercased |
 
 Money is stored as `numeric(10,2)`; format with `Intl.NumberFormat('en-US', {
 style: 'currency', currency: 'USD' })` in `format.ts`, never with float math.
+Stripe amounts are integer cents: `priceToCents` in `lib/stripe/money.ts` parses
+digit by digit (never `parseFloat` or `* 100`), and the platform fee is
+`amountCents * 1000 / 10000`, rounded.
 
 ## Image upload
 
@@ -161,9 +228,15 @@ The listing is created only after the upload succeeds (photo is required).
 - **`/`** — app shell (sidebar + header) and the listing grid. Reads
   `searchParams.category` and `searchParams.q`; refetches `/api/listings` on
   change. Search input is debounced (~300 ms). Newest first.
-- **Sidebar** — logo + "Marketplace", then the 19 categories as nav links
-  (`/?category=<slug>`). Active category is highlighted. On mobile the sidebar
-  collapses into a drawer/hamburger.
+- **Sidebar** — logo + "Marketplace", then "Create new listing" and "Connect
+  with Stripe", then the 19 categories as nav links (`/?category=<slug>`).
+  Active category is highlighted. On mobile the sidebar collapses into a
+  drawer/hamburger with the same two actions.
+- **`/connect`** — email field → `POST /api/connect/account-link` → full-page
+  redirect to Stripe. Returning with `?step=done&email=…` fetches
+  `/api/connect/status` and shows either the connected panel or a
+  "continue onboarding" form; `?step=refresh` shows the same form, since Stripe
+  sends sellers back there when a link expires.
 - **Listing card** — square photo, price, title (2-line clamp), location; links
   to `/item/[id]`.
 - **`/create`** — "Choose listing type" with four cards (Item for sale, Create
@@ -193,6 +266,13 @@ The listing is created only after the upload succeeds (photo is required).
 - Server-side validation on every route; client validation is UX only.
 - `seller_email` for messages is derived server-side from the listing.
 - Upload mime/size enforced server-side; filenames sanitized.
+- The Stripe secret key and `STRIPE_WEBHOOK_SECRET` are server-only, read from
+  the environment, never from the client and never committed. The SDK client is
+  behind `import "server-only"`.
+- `/api/stripe/webhook` verifies the `stripe-signature` header against the raw
+  body before doing anything; a missing or invalid signature is a `400`.
+- Money never touches floats: `numeric(10,2)` in Postgres, integer cents at the
+  Stripe boundary.
 - Out of scope / accepted risk: no rate limiting or abuse controls (no auth).
 
 ## Testing
@@ -203,6 +283,8 @@ The listing is created only after the upload succeeds (photo is required).
   - price/date formatting
   - query building (category filter, search, ordering, pagination)
   - upload mime/size guard
+  - Stripe money math (string → integer cents, fee, payout; float traps)
+  - Connect email validation and the onboarding query builders
 - `vitest.config.mts` mirrors the `@` alias.
 - **Playwright**: `tests/e2e/marketplace.spec.ts` covers browse → category
   filter → detail → message seller, and create with a photo upload. Selectors
@@ -221,7 +303,13 @@ The listing is created only after the upload succeeds (photo is required).
 - `.github/workflows/ci.yml` runs typecheck, lint, unit tests, and build on
   push/PR.
 - Vercel import from the GitHub default branch; build command `npm run build`;
-  add `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in the Vercel dashboard.
+  add `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY` and
+  `STRIPE_WEBHOOK_SECRET` in the Vercel dashboard (plus `NEXT_PUBLIC_APP_URL`
+  if the forwarded host is not the public one).
+- The Stripe webhook endpoint is registered **once**, in the Stripe dashboard,
+  against the production URL — Vercel preview URLs are login-protected, so
+  Stripe cannot reach them. `STRIPE_WEBHOOK_SECRET` is the signing secret of
+  that endpoint.
 - `vercel.json` pins functions to `hnd1` (Tokyo), next to the Supabase project in
   `ap-northeast-1`.
 - Production URL is the public entry point

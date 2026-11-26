@@ -44,14 +44,14 @@ shadows — elevation is a 1 px border plus a small shadow on hover.
 
 - Fixed **left sidebar** (288 px) + scrolling **main** area.
 - Sidebar: blue circular "F" logo + "Marketplace" wordmark, a full-width
-  primary **Create new listing** button (Plus icon, `--color-fb`), then a
-  "Categories" label and the 19-category vertical nav. Active category =
+  primary **Create new listing** button (Plus icon, `--color-fb`), a full-width
+  outline **Connect with Stripe** button (dollar icon), then a "Categories"
+  label and the 19-category vertical nav. Active category =
   `--color-fb-soft` background + blue text.
 - Header/top-right: decorative mail, bell, and profile icons (out of scope).
 - Mobile: sidebar collapses to a top bar with a hamburger drawer; the grid goes
-  to 1–2 columns. The drawer repeats the logo and the **Create new listing**
-  button above the category nav, so the create flow is reachable at every
-  breakpoint.
+  to 1–2 columns. The drawer repeats the logo and both action buttons above the
+  category nav, so those flows are reachable at every breakpoint.
 
 ## Screens
 
@@ -95,6 +95,22 @@ Three columns on desktop, stacked on mobile.
 - **Right rail:** title, price, "Listed 1 hour ago in `<location>`", "Seller
   Information" + seller, then "Send seller a message" label, a textarea
   (placeholder "I want to buy your bike!"), and a primary **Send** button.
+
+### Connect (`/connect`)
+
+Single centred column (max ~672 px), matching the `/create` reading width.
+
+- Heading "Connect with Stripe" + a short paragraph: the email must match the
+  listings, buyers get a Buy Now button, payouts are minus the 10% fee.
+- **Setup card** (rounded-2xl, 1 px `--color-border`, surface): "Seller email"
+  label, a hint line, an email input, and a full-width primary
+  **Connect with Stripe** button that shows a spinner while in flight.
+- **Connected card** (same shape): a party-popper icon in `--color-fb`, the
+  line "Your Stripe account is connected", and the fee/payout note. Announced
+  through `aria-live="polite"`.
+- **Resume state:** when the account exists but `charges_enabled` is still
+  false, the setup card stays and gains a line explaining onboarding is not
+  finished; the button reads "Continue onboarding".
 
 ## States
 

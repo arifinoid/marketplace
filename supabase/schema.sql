@@ -68,6 +68,35 @@ create table public.messages (
 
 create index messages_listing_id_idx on public.messages (listing_id, created_at desc);
 
+-- ---------- Stripe connect accounts -----------------------------------------
+-- Test 4. A seller is identified by the email on their listings, so one row
+-- here maps that email to a Stripe Connect account. Onboarding state is an
+-- append-only event log rather than an editable column: it keeps the whole
+-- schema INSERT-only, so no UPDATE policy is needed and the webhook cannot
+-- rewrite an account id.
+
+create table if not exists public.stripe_accounts (
+  id                uuid primary key default gen_random_uuid(),
+  seller_email      varchar(255) not null unique,
+  stripe_account_id varchar(255) not null unique,
+  created_at        timestamptz not null default now()
+);
+
+create index if not exists stripe_accounts_stripe_account_id_idx
+  on public.stripe_accounts (stripe_account_id);
+
+create table if not exists public.stripe_account_events (
+  id                uuid primary key default gen_random_uuid(),
+  stripe_account_id varchar(255) not null,
+  charges_enabled   boolean not null default false,
+  details_submitted boolean not null default false,
+  payouts_enabled   boolean not null default false,
+  created_at        timestamptz not null default now()
+);
+
+create index if not exists stripe_account_events_lookup_idx
+  on public.stripe_account_events (stripe_account_id, created_at desc);
+
 -- ---------- updated_at trigger ---------------------------------------------
 
 create or replace function public.set_updated_at()
@@ -86,9 +115,11 @@ create trigger listings_set_updated_at
 
 -- ---------- Row Level Security ---------------------------------------------
 
-alter table public.categories enable row level security;
-alter table public.listings   enable row level security;
-alter table public.messages   enable row level security;
+alter table public.categories           enable row level security;
+alter table public.listings             enable row level security;
+alter table public.messages             enable row level security;
+alter table public.stripe_accounts      enable row level security;
+alter table public.stripe_account_events enable row level security;
 
 create policy "categories are readable by everyone"
   on public.categories for select to anon using (true);
@@ -105,6 +136,20 @@ create policy "messages are readable by everyone"
 create policy "anyone can send messages"
   on public.messages for insert to anon with check (true);
 
+create policy "stripe accounts are readable by everyone"
+  on public.stripe_accounts for select to anon using (true);
+
+create policy "the server can create connect accounts"
+  on public.stripe_accounts for insert to anon with check (true);
+
+create policy "stripe account events are readable by everyone"
+  on public.stripe_account_events for select to anon using (true);
+
+-- The webhook appends onboarding state; it never rewrites an account, so this
+-- stays an insert-only table like every other one here.
+create policy "the webhook can append account events"
+  on public.stripe_account_events for insert to anon with check (true);
+
 -- ---------- Data API exposure ----------------------------------------------
 -- Since 2026-04-28 new public-schema tables are not auto-exposed to the Data
 -- API. Grant the anon role access explicitly (RLS still applies row-level).
@@ -113,6 +158,8 @@ grant usage on schema public to anon;
 grant select on public.categories to anon;
 grant select, insert on public.listings to anon;
 grant select, insert on public.messages to anon;
+grant select, insert on public.stripe_accounts to anon;
+grant select, insert on public.stripe_account_events to anon;
 
 -- ---------- Storage ---------------------------------------------------------
 
