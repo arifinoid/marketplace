@@ -5,7 +5,7 @@ listing and message a seller, and everything is public.
 
 Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 
-**Status:** M1 + M2 done.
+**Status:** M1 + M2 + M3 done.
 
 - **M1** — Next.js 15 + Tailwind v4 + shadcn `base-nova` scaffold, theme tokens,
   app shell (sidebar + header). Verified: typecheck / lint / build / SSR smoke.
@@ -13,6 +13,11 @@ Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
   domain types, pure validation + formatting, query builders, API client /
   response helpers, and 22 unit tests. Verified: typecheck / lint / tests /
   build. Live DB calls still need `.env.local` + the schema applied.
+- **M3** — API routes: `/api/listings` (GET, POST), `/api/listings/[id]` (GET),
+  `/api/messages` (GET, POST), `/api/upload` (POST). Pure query/upload guards
+  + 20 unit tests (42 total). Verified: typecheck / lint / tests / build /
+  HTTP smoke (400 / 413 / 415 / 500 envelopes). Live DB calls still need
+  `.env.local` + the schema applied.
 
 ## Done criteria
 
