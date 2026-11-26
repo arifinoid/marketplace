@@ -18,8 +18,9 @@ Path alias: `@/*` → `src/*`. `cn()` from `@/lib/utils`.
 
 ## Environment
 
-`.env.local` (gitignored). The browser never talks to Supabase directly, so all
-Supabase variables are **server-only** — do not prefix them with `NEXT_PUBLIC_`.
+`.env.local` (gitignored) holds the two variables below. The browser never talks
+to Supabase directly, so all Supabase variables are **server-only** — do not
+prefix them with `NEXT_PUBLIC_`.
 
 ```bash
 SUPABASE_URL=https://<project>.supabase.co
@@ -221,5 +222,8 @@ The listing is created only after the upload succeeds (photo is required).
   push/PR.
 - Vercel import from the GitHub default branch; build command `npm run build`;
   add `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in the Vercel dashboard.
-- Production URL is the public entry point (`https://<project>.vercel.app`).
+- `vercel.json` pins functions to `hnd1` (Tokyo), next to the Supabase project in
+  `ap-northeast-1`.
+- Production URL is the public entry point
+  (`https://arifinoid-marketplace.vercel.app/`).
 - Work on a feature branch, open a PR, the user merges. Do not merge to `main`.

@@ -14,12 +14,23 @@ and Tailwind CSS v4.
 
 Bonus: keyword search, email the seller on message.
 
+**Live:** <https://arifinoid-marketplace.vercel.app/>
+
 ## Quick start
 
 ```bash
 npm install
-# create .env.local with SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY (see CLAUDE.md)
-npm run dev                        # http://localhost:3000
+printf 'SUPABASE_URL=\nSUPABASE_PUBLISHABLE_KEY=\n' > .env.local  # then fill in both
+npm run dev                  # http://localhost:3000
+```
+
+`.env.local` is gitignored. Both values come from the Supabase dashboard
+(Project Settings -> API) and stay server-only — never prefix them with
+`NEXT_PUBLIC_`:
+
+```bash
+SUPABASE_URL=https://<project>.supabase.co
+SUPABASE_PUBLISHABLE_KEY=<publishable-or-anon-key>
 ```
 
 Apply `DATABASE.md` in the Supabase SQL editor before creating listings.
@@ -72,3 +83,13 @@ them on demand with `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` as secrets.
 Vercel import from the GitHub default branch; build command `npm run build`;
 add `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` as environment variables.
 Work on a feature branch and open a PR; the user merges.
+
+`vercel.json` pins functions to `hnd1` (Tokyo) so they run next to the Supabase
+project. Change it if the database moves region.
+
+## Performance
+
+`GET /api/listings`, `GET /api/listings/[id]` and `/` are anonymously readable
+and change only when someone posts, so they carry
+`Cache-Control: public, s-maxage=10, stale-while-revalidate=59` and are served
+from the Vercel CDN. The policy lives in `src/lib/api/cache-policy.ts`.
