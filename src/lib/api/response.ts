@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { PUBLIC_CACHE_CONTROL } from "./cache-policy"
 
 interface ErrorBody {
   error: {
@@ -22,6 +23,14 @@ function errorResponse(
 
 export function ok<T>(data: T): NextResponse {
   return NextResponse.json({ data })
+}
+
+/** CDN-cache a successful GET response. See `cache-policy.ts`. */
+export function okWithCache<T>(data: T): NextResponse {
+  return NextResponse.json(
+    { data },
+    { headers: { "Cache-Control": PUBLIC_CACHE_CONTROL } },
+  )
 }
 
 export function created<T>(data: T): NextResponse {

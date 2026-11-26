@@ -64,10 +64,11 @@ export async function listListings(
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1)
 
+  // Filter on the embedded category so the slug resolves inside PostgREST.
+  // A separate `categories` lookup here would cost an extra round trip on
+  // every request, which dominates the response time from a remote function.
   if (params.category) {
-    const categoryId = await getCategoryIdBySlug(params.category)
-    if (!categoryId) return { data: [], total: 0 }
-    query = query.eq("category_id", categoryId)
+    query = query.eq("categories.slug", params.category)
   }
 
   const q = escapeSearch(params.q ?? "")
