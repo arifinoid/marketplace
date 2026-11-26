@@ -203,8 +203,15 @@ The listing is created only after the upload succeeds (photo is required).
   - query building (category filter, search, ordering, pagination)
   - upload mime/size guard
 - `vitest.config.mts` mirrors the `@` alias.
-- **Playwright** (optional): create → appears in grid → open detail → send
-  message. Select by `data-testid`; screenshots to `playwright/screenshots/`.
+- **Playwright**: `tests/e2e/marketplace.spec.ts` covers browse → category
+  filter → detail → message seller, and create with a photo upload. Selectors
+  use accessible roles and labels rather than `data-testid`, so the tests track
+  the UI a visitor actually sees. Traces and screenshots are kept on failure.
+- The e2e tests need a running server and a real Supabase project (`.env.local`),
+  and they write real rows — there is no DELETE policy.
+  `npm run test:e2e` starts the dev server itself; set `E2E_BASE_URL` to test a
+  deployed environment instead. `.github/workflows/e2e.yml` runs them manually
+  with the Supabase variables as repository secrets.
 - Gate: `npm run typecheck && npm run lint && npm test`; `npm run build` before
   deploy.
 

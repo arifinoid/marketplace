@@ -217,7 +217,11 @@ export function ListingForm() {
                   errors.category ? "listing-category-error" : undefined
                 }
               >
-                <SelectValue placeholder="Choose a category" />
+                <SelectValue placeholder="Choose a category">
+                  {(value) =>
+                    CATEGORIES.find((item) => item.slug === value)?.name ?? ""
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {CATEGORIES.map((item) => (

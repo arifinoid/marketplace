@@ -35,9 +35,27 @@ Apply `DATABASE.md` in the Supabase SQL editor before creating listings.
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | Vitest unit tests |
 | `npm run test:watch` | Vitest watch mode |
+| `npm run test:e2e` | Playwright end-to-end tests |
 
 Gate before committing: `npm run typecheck && npm run lint && npm test`.
 Run `npm run build` before deploying.
+
+## End-to-end tests
+
+`tests/e2e/` drives a real browser through the four done criteria: browse,
+category filter, open a listing, message the seller, and create a listing with a
+photo.
+
+They need a server and a real database:
+
+```bash
+npm run test:e2e                                # starts `npm run dev` itself
+E2E_BASE_URL=https://arifinoid-marketplace.vercel.app/ npm run test:e2e
+```
+
+`.env.local` must be present, and the tests write real rows — the schema has no
+DELETE policy, so expect them to accumulate. `.github/workflows/e2e.yml` runs
+them on demand with `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` as secrets.
 
 ## Docs
 
