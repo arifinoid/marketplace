@@ -14,7 +14,11 @@ interface BuiltQuery {
 
 const { built, state } = vi.hoisted(() => ({
   built: [] as BuiltQuery[],
-  state: { single: null as unknown },
+  state: {
+    single: null as unknown,
+    /** Sequential answers for consecutive reads in one call. */
+    singles: [] as unknown[],
+  },
 }))
 
 /**
@@ -61,7 +65,9 @@ vi.mock("@/lib/supabase/server", () => ({
         maybeSingle: () => {
           query.op = "maybeSingle"
           built.push(snapshot())
-          return Promise.resolve({ data: state.single, error: null })
+          const value =
+            state.singles.length > 0 ? state.singles.shift() : state.single
+          return Promise.resolve({ data: value, error: null })
         },
         upsert: (
           payload: unknown,
@@ -88,6 +94,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }))
 
 import {
+  canAcceptPayments,
   findStripeAccountByEmail,
   getAccountStatus,
   insertStripeAccount,
@@ -97,6 +104,7 @@ import {
 beforeEach(() => {
   built.length = 0
   state.single = null
+  state.singles = []
 })
 
 describe("findStripeAccountByEmail", () => {
@@ -158,6 +166,33 @@ describe("insertStripeAccount", () => {
         stripe_account_id: "acct_1QwErTy",
       }),
     ).rejects.toThrow("Connect account was not stored")
+  })
+})
+
+describe("canAcceptPayments", () => {
+  it("is false when the seller never connected", async () => {
+    state.single = null
+
+    expect(await canAcceptPayments("wei@example.com")).toBe(false)
+  })
+
+  it("is false until Stripe enables charges", async () => {
+    // First read: the account row. Second read: its newest event.
+    state.singles = [
+      { seller_email: "wei@example.com", stripe_account_id: "acct_1QwErTy" },
+      { charges_enabled: false, details_submitted: true, payouts_enabled: false },
+    ]
+
+    expect(await canAcceptPayments("wei@example.com")).toBe(false)
+  })
+
+  it("is true once charges are enabled", async () => {
+    state.singles = [
+      { seller_email: "wei@example.com", stripe_account_id: "acct_1QwErTy" },
+      { charges_enabled: true, details_submitted: true, payouts_enabled: true },
+    ]
+
+    expect(await canAcceptPayments("wei@example.com")).toBe(true)
   })
 })
 

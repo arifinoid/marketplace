@@ -25,6 +25,17 @@ export interface Listing {
   location: string
   created_at: string
   updated_at: string
+  /**
+   * Derived, never stored on the row: a paid `orders` row exists for this
+   * listing. Kept out of `listings` so that table needs no UPDATE policy.
+   */
+  sold: boolean
+}
+
+/** Detail response: the listing plus the two flags the item page acts on. */
+export interface ListingDetail extends Listing {
+  /** The seller has a Connect account with `charges_enabled`. */
+  sellerReady: boolean
 }
 
 /** Raw row shape returned by supabase-js for a listing with its category. */

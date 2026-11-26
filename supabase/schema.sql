@@ -97,6 +97,32 @@ create table if not exists public.stripe_account_events (
 create index if not exists stripe_account_events_lookup_idx
   on public.stripe_account_events (stripe_account_id, created_at desc);
 
+-- ---------- Orders -----------------------------------------------------------
+-- Test 4. A row here IS a completed payment: the webhook inserts one only when
+-- Stripe reports `payment_status = paid`. "Sold" is derived from the existence
+-- of a row, so `listings` never needs an UPDATE policy.
+
+create table if not exists public.orders (
+  id                         uuid primary key default gen_random_uuid(),
+  listing_id                 uuid not null references public.listings(id) on delete cascade,
+  buyer_email                varchar(255) not null,
+  stripe_checkout_session_id varchar(255) not null unique,
+  stripe_account_id          varchar(255) not null,
+  amount_cents               integer not null check (amount_cents >= 0),
+  fee_cents                  integer not null check (fee_cents >= 0),
+  currency                   char(3) not null default 'usd',
+  status                     varchar(32) not null default 'paid',
+  created_at                 timestamptz not null default now()
+);
+
+create index if not exists orders_listing_id_idx on public.orders (listing_id);
+create index if not exists orders_buyer_email_idx on public.orders (buyer_email);
+
+-- One paid order per listing, so a retried webhook (or a second buyer racing
+-- the first) cannot create a second "sold" state.
+create unique index if not exists orders_one_paid_per_listing_idx
+  on public.orders (listing_id) where status = 'paid';
+
 -- ---------- updated_at trigger ---------------------------------------------
 
 create or replace function public.set_updated_at()
@@ -120,6 +146,7 @@ alter table public.listings             enable row level security;
 alter table public.messages             enable row level security;
 alter table public.stripe_accounts      enable row level security;
 alter table public.stripe_account_events enable row level security;
+alter table public.orders                enable row level security;
 
 create policy "categories are readable by everyone"
   on public.categories for select to anon using (true);
@@ -150,6 +177,13 @@ create policy "stripe account events are readable by everyone"
 create policy "the webhook can append account events"
   on public.stripe_account_events for insert to anon with check (true);
 
+create policy "orders are readable by everyone"
+  on public.orders for select to anon using (true);
+
+-- The webhook is the only writer, and only for a session it created.
+create policy "the webhook can record orders"
+  on public.orders for insert to anon with check (true);
+
 -- ---------- Data API exposure ----------------------------------------------
 -- Since 2026-04-28 new public-schema tables are not auto-exposed to the Data
 -- API. Grant the anon role access explicitly (RLS still applies row-level).
@@ -160,6 +194,7 @@ grant select, insert on public.listings to anon;
 grant select, insert on public.messages to anon;
 grant select, insert on public.stripe_accounts to anon;
 grant select, insert on public.stripe_account_events to anon;
+grant select, insert on public.orders to anon;
 
 -- ---------- Storage ---------------------------------------------------------
 

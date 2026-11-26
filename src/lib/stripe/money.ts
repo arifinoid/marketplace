@@ -27,6 +27,20 @@ export function priceToCents(price: string | number): number {
   return sign === "-" ? -cents : cents
 }
 
+const currencyFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+})
+
+/**
+ * Display-only formatting for an integer-cent amount. The division is safe
+ * here: `Intl.NumberFormat` rounds to two decimal places, and no arithmetic is
+ * performed on the result. All money math stays in cents.
+ */
+export function formatCents(cents: number): string {
+  return currencyFormatter.format(cents / 100)
+}
+
 /** Platform fee in cents, rounded to the nearest cent. */
 export function platformFeeCents(amountCents: number): number {
   return Math.round((amountCents * PLATFORM_FEE_BPS) / 10_000)

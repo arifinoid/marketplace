@@ -92,9 +92,32 @@ Three columns on desktop, stacked on mobile.
 ### Listing detail (`/item/[id]`)
 
 - **Left:** large photo (square/4:3, rounded-2xl).
-- **Right rail:** title, price, "Listed 1 hour ago in `<location>`", "Seller
+- **Right rail:** title (with a secondary **Sold** badge beside it when the
+  listing has a paid order), price, "Listed 1 hour ago in `<location>`", "Seller
   Information" + seller, then "Send seller a message" label, a textarea
   (placeholder "I want to buy your bike!"), and a primary **Send** button.
+- **Buy Now card** — above the message form, only when the seller has
+  `charges_enabled` and the listing is not sold: "Buy it now" label, a
+  "Your email" input, and a full-width primary **Buy Now** button. The button
+  shows a spinner and reads "Opening checkout…" while the session is created.
+  A `409` ("already sold" / "seller not ready") renders as an inline
+  `role="alert"` line; the buyer is not redirected.
+- **Sold on the grid** — the card image is dimmed to 60% and a secondary
+  **Sold** badge is pinned to its top-left.
+
+### Checkout (`/checkout/success`, `/checkout/cancel`)
+
+Both are single centred columns (max ~672 px), matching `/connect`.
+
+- **Success** — a confirmation card with a blue check icon, the heading
+  "Payment confirmed", and a note that the seller is paid minus the 10% fee.
+  Below it, an order card with the listing title and
+  `<amount> · buyer <email>`, then a "View the listing" link. Before the order
+  row exists, the card is replaced by a spinner card, "Confirming your
+  payment…", which re-renders itself for up to 20 s.
+- **Cancel** — a muted cross icon, "Checkout cancelled", "You were not charged,
+  and the listing is still available.", then links back to the listing and to
+  the board.
 
 ### Connect (`/connect`)
 

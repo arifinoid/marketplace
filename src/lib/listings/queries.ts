@@ -1,5 +1,6 @@
 import { DEFAULT_LIMIT, MAX_LIMIT } from "@/lib/api/params"
 import { getSupabase } from "@/lib/supabase/server"
+import { findSoldListingIds, isListingSold } from "@/lib/orders/queries"
 import type {
   CreateListingInput,
   ListListingsParams,
@@ -8,7 +9,7 @@ import type {
   ListingRow,
 } from "./types"
 
-function mapListing(row: ListingRow): Listing {
+function mapListing(row: ListingRow, sold = false): Listing {
   return {
     id: row.id,
     title: row.title,
@@ -21,6 +22,7 @@ function mapListing(row: ListingRow): Listing {
     location: row.location,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    sold,
   }
 }
 
@@ -84,8 +86,12 @@ export async function listListings(
 
   if (error) throw new Error(`Failed to list listings: ${error.message}`)
 
+  const rows = data as ListingRow[]
+  // One extra round trip for the whole page rather than one per card.
+  const soldIds = await findSoldListingIds(rows.map((row) => row.id))
+
   return {
-    data: (data as ListingRow[]).map(mapListing),
+    data: rows.map((row) => mapListing(row, soldIds.has(row.id))),
     total: count ?? 0,
   }
 }
@@ -99,7 +105,10 @@ export async function getListing(id: string): Promise<Listing | null> {
     .maybeSingle()
 
   if (error) throw new Error(`Failed to load listing: ${error.message}`)
-  return data ? mapListing(data as ListingRow) : null
+  if (!data) return null
+
+  const row = data as ListingRow
+  return mapListing(row, await isListingSold(row.id))
 }
 
 export async function createListing(

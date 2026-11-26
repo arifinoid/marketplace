@@ -48,6 +48,11 @@ export function notFound(message = "Not found"): NextResponse<ErrorBody> {
   return errorResponse(404, "not_found", message)
 }
 
+/** 409 — the request is valid but conflicts with the current state. */
+export function conflict(message: string): NextResponse<ErrorBody> {
+  return errorResponse(409, "conflict", message)
+}
+
 export function payloadTooLarge(message: string): NextResponse<ErrorBody> {
   return errorResponse(413, "payload_too_large", message)
 }
