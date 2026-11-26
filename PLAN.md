@@ -5,7 +5,7 @@ listing and message a seller, and everything is public.
 
 Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 
-**Status:** M1 + M2 + M3 done.
+**Status:** M1 + M2 + M3 + M4 done.
 
 - **M1** — Next.js 15 + Tailwind v4 + shadcn `base-nova` scaffold, theme tokens,
   app shell (sidebar + header). Verified: typecheck / lint / build / SSR smoke.
@@ -18,6 +18,11 @@ Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
   + 20 unit tests (42 total). Verified: typecheck / lint / tests / build /
   HTTP smoke (400 / 413 / 415 / 500 envelopes). Live DB calls still need
   `.env.local` + the schema applied.
+- **M4** — Browse: server-rendered first grid, client refetch on category /
+  debounced keyword search, listing card, skeleton / empty / error states with
+  retry. Verified: typecheck / lint / tests / build; end-to-end against a local
+  mock Supabase (grid, `?category=` filter + heading, `?q=` search). Real
+  Supabase still needs `.env.local` + the schema applied.
 
 ## Done criteria
 
