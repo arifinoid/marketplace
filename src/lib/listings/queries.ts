@@ -1,3 +1,4 @@
+import { DEFAULT_LIMIT, MAX_LIMIT } from "@/lib/api/params"
 import { getSupabase } from "@/lib/supabase/server"
 import type {
   CreateListingInput,
@@ -6,9 +7,6 @@ import type {
   Listing,
   ListingRow,
 } from "./types"
-
-export const DEFAULT_LIMIT = 24
-export const MAX_LIMIT = 100
 
 function mapListing(row: ListingRow): Listing {
   return {

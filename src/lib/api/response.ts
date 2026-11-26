@@ -39,6 +39,16 @@ export function notFound(message = "Not found"): NextResponse<ErrorBody> {
   return errorResponse(404, "not_found", message)
 }
 
+export function payloadTooLarge(message: string): NextResponse<ErrorBody> {
+  return errorResponse(413, "payload_too_large", message)
+}
+
+export function unsupportedMediaType(
+  message: string,
+): NextResponse<ErrorBody> {
+  return errorResponse(415, "unsupported_media_type", message)
+}
+
 export function serverError(): NextResponse<ErrorBody> {
   return errorResponse(500, "server_error", "Something went wrong")
 }
