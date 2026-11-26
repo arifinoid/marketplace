@@ -5,7 +5,8 @@ listing and message a seller, and everything is public.
 
 Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 
-**Status:** M1 + M2 + M3 + M4 + M5 + M6 + M7 done (deploy pending).
+**Status:** M1 + M2 + M3 + M4 + M5 + M6 + M7 + M8 done. Live at
+<https://arifinoid-marketplace.vercel.app/>.
 
 - **M1** — Next.js 15 + Tailwind v4 + shadcn `base-nova` scaffold, theme tokens,
   app shell (sidebar + header). Verified: typecheck / lint / build / SSR smoke.
@@ -40,6 +41,10 @@ Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
   (`.github/workflows/ci.yml`) that runs the same gates on push/PR. Verified:
   typecheck clean, lint exit 0, 42/42 tests, build clean, 17/17 smoke checks as
   expected. Deploy still pending (Vercel import from the default branch).
+- **M8** — Docs: `.env.example` template, the live URL in `README.md` / `SPECS.md`,
+  and the function-region note in `vercel.json`. Verified live: 9/9 smoke checks
+  on the production URL (pages `200`, unknown and malformed ids `404`, API `200`
+  / `400`).
 
 ## Done criteria
 
