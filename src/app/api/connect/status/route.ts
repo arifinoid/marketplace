@@ -1,5 +1,10 @@
 import { badRequest, ok, serverError } from "@/lib/api/response"
-import { findStripeAccountByEmail, getAccountStatus } from "@/lib/connect/queries"
+import { fetchAccountFlags } from "@/lib/connect/account-status"
+import {
+  findStripeAccountByEmail,
+  getAccountStatus,
+  recordAccountEvent,
+} from "@/lib/connect/queries"
 import { parseEmailParam } from "@/lib/connect/validation"
 import type { ConnectStatus } from "@/lib/connect/types"
 
@@ -22,7 +27,26 @@ export async function GET(request: Request) {
       })
     }
 
-    const flags = await getAccountStatus(row.stripe_account_id)
+    let flags = await getAccountStatus(row.stripe_account_id)
+
+    // Stripe redirects the seller back here the moment they finish onboarding,
+    // which can beat the webhook. Ask Stripe before telling the seller they are
+    // still stuck; once our stored flags say charges are enabled the page is
+    // served from the database alone.
+    if (flags?.charges_enabled !== true) {
+      const live = await fetchAccountFlags(row.stripe_account_id)
+      if (live) {
+        if (
+          live.charges_enabled !== flags?.charges_enabled ||
+          live.details_submitted !== flags?.details_submitted ||
+          live.payouts_enabled !== flags?.payouts_enabled
+        ) {
+          await recordAccountEvent(row.stripe_account_id, live)
+        }
+        flags = live
+      }
+    }
+
     return ok<ConnectStatus>({
       email,
       connected: true,

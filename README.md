@@ -34,7 +34,12 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are server-only, like the
 Supabase pair. The webhook secret comes from the Connect endpoint registered
 against the **production** URL (`/api/stripe/webhook`) in the Stripe dashboard —
-Vercel protects preview deployments, so Stripe cannot reach them.
+Vercel protects preview deployments, so Stripe cannot reach them. Subscribe to
+`checkout.session.completed` and the `v2.core.account[requirements].updated` /
+`v2.core.account[configuration.merchant]*` events; accounts are created through
+Accounts v2, so the v1 `account.updated` event is not used. The handler verifies
+the signature against the raw body and branches between classic v1 events and
+thin v2 notifications, which need different SDK calls.
 
 ## Quick start
 

@@ -5,9 +5,9 @@ listing and message a seller, and everything is public.
 
 Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 
-**Status:** M1 + M2 + M3 + M4 + M5 + M6 + M7 + M8 + M9 + M10 + M11 done; Test 4
-(Stripe Connect) is M9–M12 below, with M12 in progress. Live at
-<https://arifinoid-marketplace.vercel.app/>.
+**Status:** M1 + M2 + M3 + M4 + M5 + M6 + M7 + M8 + M9 + M10 + M11 + M12 done;
+Test 4 (Stripe Connect) is M9–M12 below, plus a Post-M12 fix that moves Connect
+to Stripe Accounts v2. Live at <https://arifinoid-marketplace.vercel.app/>.
 
 - **M1** — Next.js 15 + Tailwind v4 + shadcn `base-nova` scaffold, theme tokens,
   app shell (sidebar + header). Verified: typecheck / lint / build / SSR smoke.
@@ -101,6 +101,25 @@ their listings (still no auth); Sold is derived from a paid `orders` row, so
   in the payload, `/connect` `200`; `/api/listings/[id]` uncached). A real
   payment still needs a sandbox seller to finish onboarding and the Connect
   webhook endpoint registered in Stripe.
+- **Post-M12** — Fix the 500 on `/api/connect/account-link`: the platform
+  requires Stripe to hold the loss liability, so creating a Connect account with
+  the legacy v1 `type` field is rejected. Accounts are now created through
+  **Accounts v2** (`dashboard: "express"`, `losses_collector: "stripe"`), the
+  onboarding link comes from `v2/core/account_links`, and the webhook handles
+  the thin `v2.core.account[requirements].updated` /
+  `v2.core.account[configuration.merchant]*` events. `charges_enabled` is
+  derived from the `card_payments` capability status. The first version called
+  `constructEvent` for everything, which rejects a thin notification outright —
+  the handler now branches on the payload shape (`isThinEventNotification`) and
+  uses `parseEventNotification` for `v2.core.event`. Verified: typecheck /
+  lint / 102 tests / build, `/api/connect/account-link` returns a real
+  `connect.stripe.com/setup/e/acct_…` URL locally, `/api/connect/status`
+  reads the account back, a Checkout session with `application_fee_amount` is
+  accepted on a v2 account, and a signed
+  `v2.core.account[requirements].updated` delivery is answered `200` and
+  appends a `stripe_account_events` row (a classic `checkout.session.completed`
+  is still `200`, a bad signature is `400`). A completed payment still needs a
+  seller to finish the hosted onboarding form.
 
 ## Done criteria
 
