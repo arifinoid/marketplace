@@ -49,9 +49,11 @@ Inspiration: Facebook Marketplace. Mockups: `assets/images/image*.png`.
 - **Post-M8** — Fix a regression from the latency work (#9): `?category=` returned
   every listing, because a PostgREST embed is a left join and the filter only
   nulled out the embed. `listListings` now selects `categories!inner(...)`; a new
-  unit test pins the built query. Verified: 45/45 unit tests, 2/2 e2e against a
-  production build, and `?category=electronics` returns only electronics while
-  `?category=vehicles` returns none.
+  unit test pins the built query. Verified: 45/45 unit tests, 3/3 e2e against
+  the deployed site, and `/api/listings?category=<slug>` returns only rows whose
+  embedded category matches. Counts are not fixed: e2e writes rows and there is
+  no DELETE policy, so a category that is empty today may not be tomorrow
+  (Vehicles went 0 → 1 on 2026-11-26).
 
 ## Done criteria
 
